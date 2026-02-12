@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MojoHub v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+    <style>
+        /* Typography & Smoothing */
+        body { 
+            font-family: 'Inter', sans-serif; 
+            -webkit-font-smoothing: antialiased; 
+            -moz-osx-font-smoothing: grayscale; 
+        }
+        
+        .font-serif { font-family: 'Playfair Display', serif; }
+
+        /* Custom Scrollbar (Invisible but functional) */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Transitions */
+        .premium-transition {
+            transition-property: all;
+            transition-timing-function: cubic-bezier(0.2, 0.0, 0.2, 1); /* Ease-out-like for snappiness */
+            transition-duration: 300ms;
+        }
+
+        /* Fade Animation Classes */
+        .fade-enter { opacity: 0; transform: translateY(4px); }
+        .fade-enter-active { opacity: 1; transform: translateY(0); transition: opacity 0.4s ease-out, transform 0.4s cubic-bezier(0.2, 0, 0.2, 1); }
+        .fade-exit { opacity: 1; transform: translateY(0); }
+        .fade-exit-active { opacity: 0; transform: translateY(-4px); transition: opacity 0.3s ease-in, transform 0.3s cubic-bezier(0.2, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
+
+    <!-- Top Navigation -->
+    <header class="w-full bg-white border-b border-gray-200 z-10 shrink-0 h-16">
+        <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <!-- Minimal Traffic Lights -->
+                <div class="flex gap-1.5 opacity-40 hover:opacity-100 transition-opacity">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+                <span class="ml-4 font-semibold text-sm tracking-tight text-gray-900">MojoHub</span>
+            </div>
+            <button onclick="toggleAddModal()" class="group flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200">
+                <span class="text-xs font-medium text-gray-500 group-hover:text-gray-900 tracking-tight">Add Book</span>
+                <svg class="text-gray-400 group-hover:text-gray-900 transition-colors" width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 2.5V9.5M2.5 6H9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-6xl mx-auto w-full p-6 grid grid-cols-12 gap-6 overflow-hidden">
+        
+        <!-- Sidebar / Library List (4 cols) -->
+        <aside class="col-span-12 md:col-span-4 flex flex-col gap-4 h-full overflow-hidden">
+            <!-- Filter Segmented Control -->
+            <div class="flex p-1 bg-gray-100 rounded-lg shrink-0 border border-gray-200">
+                <button onclick="setFilter('all')" id="filter-all" class="flex-1 py-1.5 text-xs font-semibold rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200 transition-all">Library</button>
+                <button onclick="setFilter('favorites')" id="filter-favorites" class="flex-1 py-1.5 text-xs font-medium rounded-[4px] text-gray-500 hover:text-gray-700 transition-all">Favorites</button>
+            </div>
+
+            <!-- Book List -->
+            <div id="library-list" class="flex-1 overflow-y-auto pr-1 space-y-2 scrollbar-hide pb-20">
+                <!-- Rendered JS Items -->
+            </div>
+        </aside>
+
+        <!-- Main Stage (8 cols) -->
+        <section class="col-span-12 md:col-span-8 flex flex-col gap-6 h-full overflow-y-auto scrollbar-hide pb-10">
+            
+            <!-- Hero: Quote Rotator -->
+            <div class="relative w-full min-h-[280px] bg-white rounded-2xl border border-gray-200 shadow-[0px_2px_8px_rgba(0,0,0,0.04)] flex flex-col items-center justify-center p-10 text-center group">
+                
+                <!-- Controls -->
+                <div class="absolute top-4 right-4 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <button onclick="toggleHeartCurrent()" id="rotator-heart" class="p-2 rounded-md hover:bg-gray-50 text-gray-300 hover:text-red-500 transition-colors">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    </button>
+                    <button onclick="nextQuoteManual()" class="p-2 rounded-md hover:bg-gray-50 text-gray-400 hover:text-gray-900 transition-colors">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                    </button>
+                </div>
+                
+                <!-- Content -->
+                <div id="quote-container" class="max-w-2xl transition-opacity duration-300 ease-out">
+                    <h2 id="quote-text" class="font-serif text-2xl md:text-3xl font-medium text-gray-900 leading-snug mb-6 tracking-tight">
+                        Initializing...
+                    </h2>
+                    <p id="quote-author" class="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                        SYSTEM
+                    </p>
+                </div>
+                
+                <!-- Micro Progress Bar -->
+                <div class="absolute bottom-0 left-0 h-[2px] bg-gray-100 w-full rounded-b-2xl overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-gray-900 w-0"></div>
+                </div>
+            </div>
+
+            <!-- Detail Panel (Active Book) -->
+            <div id="detail-view" class="hidden grid grid-cols-1 gap-6 animate-[fadeIn_0.3s_ease-out]">
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-[0px_2px_8px_rgba(0,0,0,0.04)] p-8">
+                    <div class="flex justify-between items-start mb-6">
+                        <div>
+                            <span id="detail-category" class="inline-block px-2 py-0.5 rounded border border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-3">Category</span>
+                            <h3 id="detail-title" class="text-xl font-semibold text-gray-900 tracking-tight mb-1">Book Title</h3>
+                            <p id="detail-author" class="text-sm text-gray-500">Author Name</p>
+                        </div>
+                        <a id="spotify-link" href="#" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors shadow-sm text-xs font-medium tracking-wide">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                            Spotify
+                        </a>
+                    </div>
+                    
+                    <p id="detail-summary" class="text-sm text-gray-600 leading-relaxed border-b border-gray-100 pb-6 mb-6">
+                        Summary content...
+                    </p>
+
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Key Insights</h4>
+                    <ul id="detail-quotes" class="space-y-3">
+                        <!-- JS Injected -->
+                    </ul>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Add Book Modal (Solid, Crisp) -->
+    <div id="add-modal" class="fixed inset-0 bg-white/90 z-50 hidden flex items-center justify-center transition-opacity duration-200 opacity-0">
+        <div class="bg-white w-full max-w-lg p-8 rounded-2xl border border-gray-200 shadow-xl transform scale-95 transition-transform duration-200">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-lg font-semibold text-gray-900 tracking-tight">Add to Library</h3>
+                <button onclick="toggleAddModal()" class="text-gray-400 hover:text-gray-900 transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
+            </div>
+            <form id="add-form" class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Title</label>
+                        <input type="text" id="input-title" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-0 transition-colors" required>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Author</label>
+                        <input type="text" id="input-author" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-0 transition-colors" required>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Summary</label>
+                    <textarea id="input-summary" rows="2" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-0 transition-colors"></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1.5">Quotes (Line separated)</label>
+                    <textarea id="input-quotes" rows="4" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm text-gray-900 focus:outline-none focus:border-gray-900 focus:ring-0 transition-colors"></textarea>
+                </div>
+                <div class="pt-2">
+                    <button type="submit" class="w-full py-2.5 text-sm font-semibold text-white bg-gray-900 hover:bg-black rounded-lg transition-colors shadow-sm">Save Book</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA (VolumeSquared Library) ---
+        const starterLibrary = [
+            { id: 1, title: "$100M Offers", author: "Alex Hormozi", category: "Strategy", summary: "How to make offers so good people feel stupid saying no.", quotes: ["Make people an offer so good they would feel stupid saying no.", "The degree of the pain will be proportional to the price you will be able to charge.", "Attention is the new currency.", "If you can't get people to say yes, you can't help them.", "Volume negates luck."] },
+            { id: 2, title: "The Psychology of Money", author: "Morgan Housel", category: "Wealth", summary: "Timeless lessons on wealth, greed, and happiness. Psychology > Math.", quotes: ["Doing well with money has a little to do with how smart you are and a lot to do with how you behave.", "Wealth is what you don't see.", "Planning is important, but the most important part of every plan is to plan on the plan not going according to plan.", "Control over your time is the highest dividend money pays.", "Save money. Just save it."] },
+            { id: 3, title: "I Will Teach You To Be Rich", author: "Ramit Sethi", category: "Wealth", summary: "No guilt, no excuses, no BS. Just a 6-week program that works.", quotes: ["Spend extravagantly on the things you love, and cut costs mercilessly on the things you don't.", "There is a limit to how much you can cut but no limit to how much you can earn.", "Don't let perfect be the enemy of good.", "The 85% Solution: Getting started is more important than becoming an expert.", "Focus on the Big Wins."] },
+            { id: 4, title: "Zero to One", author: "Peter Thiel", category: "Strategy", summary: "Notes on startups, or how to build the future. First principles thinking.", quotes: ["The best entrepreneurs know this: every great business is built around a secret that's hidden from the outside.", "Competition is for losers.", "All happy companies are different: each one earns a monopoly by solving a unique problem.", "Sales matters just as much as product.", "What important truth do very few people agree with you on?"] },
+            { id: 5, title: "The 4-Hour Workweek", author: "Tim Ferriss", category: "Focus", summary: "Escape 9-5, live anywhere, and join the New Rich. Efficiency over presence.", quotes: ["Focus on being productive instead of busy.", "What is the worst that could happen?", "Doing something unimportant well does not make it important.", "People will choose unhappiness over uncertainty.", "The opposite of love is indifference, and the opposite of happiness is boredom."] },
+            { id: 6, title: "Atomic Habits", author: "James Clear", category: "Focus", summary: "Tiny changes, remarkable results. The system is the solution.", quotes: ["You do not rise to the level of your goals. You fall to the level of your systems.", "Every action you take is a vote for the type of person you wish to become.", "Habits are the compound interest of self-improvement.", "Be the designer of your world and not merely the consumer of it.", "Focus not on what you want to achieve, but on who you wish to become."] },
+            { id: 7, title: "Essentialism", author: "Greg McKeown", category: "Focus", summary: "The disciplined pursuit of less. Rejection criteria applied to life.", quotes: ["If it isn't a clear yes, then it's a clear no.", "You cannot overestimate the unimportance of practically everything.", "Less but better.", "The ability to choose cannot be taken away or even given away—it can only be forgotten.", "Trade popularity for respect."] },
+            { id: 8, title: "Show Your Work!", author: "Austin Kleon", category: "Creativity", summary: "10 ways to share your creativity and get discovered.", quotes: ["Amateurs know that contributing something is better than contributing nothing.", "Share something small every day.", "Don't hoard.", "Teach what you know.", "You don't have to be a genius."] },
+            { id: 9, title: "The War of Art", author: "Steven Pressfield", category: "Mindset", summary: "Break through the blocks and win your inner creative battles.", quotes: ["The amateur plays for fun. The professional plays for keeps.", "Resistance is experienced as fear.", "The more important a call or action is to our soul's evolution, the more Resistance we will feel toward pursuing it.", "Turning pro is a mindset.", "Start before you are ready."] },
+            { id: 10, title: "Feel-Good Productivity", author: "Ali Abdaal", category: "Focus", summary: "How to do more of what matters to you. Joy as fuel.", quotes: ["Success doesn't lead to happiness. Happiness leads to success.", "Play is the engine of productivity.", "Consistency is not about discipline; it's about friction.", "Find the fun.", "Relax to recharge."] },
+            { id: 11, title: "Deep Work", author: "Cal Newport", category: "Focus", summary: "Rules for focused success in a distracted world.", quotes: ["Clarity about what matters provides clarity about what does not.", "Who you are, what you think, feel, and do, what you love—is the sum of what you focus on.", "Deep work is the superpower of the 21st century.", "Embrace boredom.", "Drain the shallows."] },
+            { id: 12, title: "Blue Ocean Strategy", author: "W. Chan Kim", category: "Strategy", summary: "How to create uncontested market space and make the competition irrelevant.", quotes: ["Value innovation is the cornerstone of blue ocean strategy.", "Don't compete with rivals—make them irrelevant.", "Focus on the big picture, not the numbers.", "Reach beyond existing demand.", "Get the strategic sequence right."] },
+            { id: 13, title: "Antifragile", author: "Nassim Taleb", category: "Strategy", summary: "Things that gain from disorder.", quotes: ["Wind extinguishes a candle and energizes fire.", "I want to live happily in a world I don't understand.", "Robustness is when you care more about the few who like your work than the multitude who dislike it.", "Avoid the middle.", "He who has never sinned is less reliable than he who has only sinned once."] },
+            { id: 14, title: "Influence", author: "Robert Cialdini", category: "Psychology", summary: "The psychology of persuasion.", quotes: ["We all fool ourselves from time to time.", "Embarrassment is a villain to be crushed.", "People want to be consistent with what they have already done.", "Social proof is powerful.", "Reciprocity is a key driver."] },
+            { id: 15, title: "The Creative Act", author: "Rick Rubin", category: "Creativity", summary: "A way of being.", quotes: ["The universe is not static, it is a constant state of becoming.", "Look for what you notice but no one else sees.", "If you have an idea you're excited about and you don't bring it to life, it's not uncommon for the idea to find its voice through another maker.", "The best work is the work you are excited about.", "We are all creators."] }
+        ];
+
+        // --- STATE & STORAGE ---
+        let library = JSON.parse(localStorage.getItem('mojo_library_v2')) || starterLibrary;
+        let favorites = JSON.parse(localStorage.getItem('mojo_favorites_v2')) || [];
+        let currentQuoteIndex = 0;
+        let activeQuoteInterval;
+        let quoteQueue = [];
+
+        // Save State
+        function saveState() {
+            localStorage.setItem('mojo_library_v2', JSON.stringify(library));
+            localStorage.setItem('mojo_favorites_v2', JSON.stringify(favorites));
+        }
+
+        // --- CORE LOGIC ---
+        function init() {
+            renderLibrary('all');
+            buildQuoteQueue();
+            startQuoteRotator();
+        }
+
+        function buildQuoteQueue() {
+            quoteQueue = [];
+            library.forEach(book => {
+                book.quotes.forEach(q => {
+                    const isFav = favorites.includes(q);
+                    // Weight: Favorites appear 3x more often
+                    if(isFav) { 
+                        quoteQueue.push({text: q, author: book.author, fav: true}); 
+                        quoteQueue.push({text: q, author: book.author, fav: true}); 
+                    }
+                    quoteQueue.push({text: q, author: book.author, fav: false});
+                });
+            });
+            quoteQueue.sort(() => Math.random() - 0.5);
+        }
+
+        function startQuoteRotator() {
+            updateQuoteDisplay();
+            activeQuoteInterval = setInterval(() => {
+                nextQuote();
+            }, 10000);
+        }
+
+        function nextQuote() {
+            currentQuoteIndex = (currentQuoteIndex + 1) % quoteQueue.length;
+            updateQuoteDisplay();
+            resetProgressBar();
+        }
+        
+        function nextQuoteManual() {
+            clearInterval(activeQuoteInterval);
+            nextQuote();
+            startQuoteRotator();
+        }
+
+        function updateQuoteDisplay() {
+            const container = document.getElementById('quote-container');
+            const q = quoteQueue[currentQuoteIndex];
+            
+            container.style.opacity = 0;
+            container.style.transform = 'translateY(4px)';
+            
+            setTimeout(() => {
+                document.getElementById('quote-text').textContent = `"${q.text}"`;
+                document.getElementById('quote-author').textContent = q.author;
+                
+                const heartBtn = document.getElementById('rotator-heart');
+                if(favorites.includes(q.text)) {
+                    heartBtn.classList.add('text-red-500', 'fill-current');
+                    heartBtn.classList.remove('text-gray-300');
+                } else {
+                    heartBtn.classList.remove('text-red-500', 'fill-current');
+                    heartBtn.classList.add('text-gray-300');
+                }
+                
+                container.style.opacity = 1;
+                container.style.transform = 'translateY(0)';
+            }, 300);
+        }
+
+        function resetProgressBar() {
+            const bar = document.getElementById('progress-bar');
+            bar.className = 'h-full bg-gray-900 w-0'; // Reset instant
+            void bar.offsetWidth; // Trigger reflow
+            bar.className = 'h-full bg-gray-900 w-full transition-all duration-[10000ms] ease-linear'; // Start anim
+        }
+
+        function toggleHeartCurrent() {
+            const q = quoteQueue[currentQuoteIndex].text;
+            if(favorites.includes(q)) {
+                favorites = favorites.filter(f => f !== q);
+            } else {
+                favorites.push(q);
+            }
+            saveState();
+            updateQuoteDisplay();
+            buildQuoteQueue();
+        }
+
+        // Library UI
+        function renderLibrary(filter) {
+            const list = document.getElementById('library-list');
+            list.innerHTML = '';
+            
+            // Tab Toggle
+            const activeClass = "flex-1 py-1.5 text-xs font-semibold rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200 transition-all";
+            const inactiveClass = "flex-1 py-1.5 text-xs font-medium rounded-[4px] text-gray-500 hover:text-gray-700 transition-all";
+            
+            document.getElementById('filter-all').className = filter === 'all' ? activeClass : inactiveClass;
+            document.getElementById('filter-favorites').className = filter === 'favorites' ? activeClass : inactiveClass;
+
+            const booksToShow = filter === 'all' 
+                ? library 
+                : library.filter(b => b.quotes.some(q => favorites.includes(q)));
+
+            booksToShow.forEach(book => {
+                const div = document.createElement('div');
+                div.className = "bg-white p-3 rounded-lg border border-gray-200 shadow-sm hover:border-gray-300 hover:shadow-md transition-all cursor-pointer group";
+                div.onclick = () => showDetail(book);
+                div.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-900 group-hover:text-black tracking-tight">${book.title}</h4>
+                            <p class="text-[10px] text-gray-500 mt-0.5">${book.author}</p>
+                        </div>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+        }
+
+        function setFilter(type) {
+            renderLibrary(type);
+        }
+
+        function showDetail(book) {
+            document.getElementById('detail-view').classList.remove('hidden');
+            
+            document.getElementById('detail-title').innerText = book.title;
+            document.getElementById('detail-author').innerText = book.author;
+            document.getElementById('detail-category').innerText = book.category;
+            document.getElementById('detail-summary').innerText = book.summary;
+            document.getElementById('spotify-link').href = `https://open.spotify.com/search/${encodeURIComponent(book.title + " " + book.author)}`;
+
+            const quoteList = document.getElementById('detail-quotes');
+            quoteList.innerHTML = '';
+            book.quotes.forEach(q => {
+                const li = document.createElement('li');
+                li.className = "text-sm text-gray-600 italic pl-3 border-l-2 border-gray-200";
+                li.innerText = `"${q}"`;
+                quoteList.appendChild(li);
+            });
+        }
+
+        // Modal Logic
+        function toggleAddModal() {
+            const modal = document.getElementById('add-modal');
+            const isHidden = modal.classList.contains('hidden');
+            if(isHidden) {
+                modal.classList.remove('hidden');
+                setTimeout(() => { 
+                    modal.classList.remove('opacity-0'); 
+                    modal.querySelector('div').classList.remove('scale-95'); 
+                }, 10);
+            } else {
+                modal.classList.add('opacity-0');
+                modal.querySelector('div').classList.add('scale-95');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+            }
+        }
+
+        document.getElementById('add-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newBook = {
+                id: Date.now(),
+                title: document.getElementById('input-title').value,
+                author: document.getElementById('input-author').value,
+                category: "Custom",
+                summary: document.getElementById('input-summary').value,
+                quotes: document.getElementById('input-quotes').value.split('\n').filter(line => line.trim() !== '')
+            };
+            library.unshift(newBook);
+            saveState();
+            buildQuoteQueue();
+            renderLibrary('all');
+            toggleAddModal();
+            e.target.reset();
+        });
+
+        // Start
+        window.addEventListener('DOMContentLoaded', () => {
+            init();
+            resetProgressBar();
+        });
+
+    </script>
+</body>
+</html>

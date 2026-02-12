@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MojoHub 3.1 | Hybrid</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .text-balance { text-wrap: balance; }
+
+        @keyframes hueCycle { 0% { filter: hue-rotate(0deg) saturate(1.1); } 50% { filter: hue-rotate(180deg) saturate(1.2); } 100% { filter: hue-rotate(360deg) saturate(1.1); } }
+        @keyframes gradientPulse { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .animate-gradient { background: linear-gradient(125deg, #4f46e5, #7c3aed, #db2777, #2563eb); background-size: 300% 300%; animation: gradientPulse 30s ease-in-out infinite, hueCycle 90s linear infinite; }
+
+        .quote-wrapper { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .quote-slide { position: absolute; width: 100%; opacity: 0; transform: scale(0.98) translateY(10px); pointer-events: none; transition: opacity 1.4s ease-in-out, transform 1.4s ease-in-out; will-change: opacity, transform; }
+        .quote-slide.active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; z-index: 10; }
+        .quote-slide .quote-author { opacity: 0; transform: translateY(8px); transition: opacity 1.4s ease-out, transform 1.4s ease-out; transition-delay: 300ms; }
+        .quote-slide.active .quote-author { opacity: 1; transform: translateY(0); }
+        
+        .progress-ring__circle { transition: stroke-dashoffset 0.1s linear; transform: rotate(-90deg); transform-origin: 50% 50%; }
+
+        /* REFINED TRAY ARCHITECTURE */
+        #detail-view { height: 56px; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); overflow: hidden; display: flex; flex-direction: column; }
+        #detail-view.detail-expanded { height: 85vh; }
+        .detail-fixed-header { flex-shrink: 0; }
+        .detail-scroll-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* FLIP SYSTEM */
+        .scene { perspective: 2000px; width: 100%; position: relative; min-height: 420px; z-index: 20; }
+        .flip-container { position: relative; width: 100%; height: 100%; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+        .is-flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; top: 0; left: 0; border-radius: 1rem 1rem 0 0; }
+        .card-front { z-index: 2; position: relative; }
+        .card-back { transform: rotateY(180deg); z-index: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; }
+
+        summary::-webkit-details-marker { display: none !important; }
+        summary::marker { content: "" !important; display: none !important; }
+        details > summary { list-style: none !important; }
+        .category-tile[open] .category-chevron { transform: rotate(180deg); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
+
+    <header class="w-full bg-white border-b border-gray-200 z-10 shrink-0 h-14">
+        <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex gap-1.5 opacity-40 hover:opacity-100 transition-opacity">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHub 3.1</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl mx-auto w-full p-6 grid grid-cols-12 gap-6 overflow-hidden">
+        
+        <section class="order-1 md:order-2 col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6 h-full overflow-y-auto scrollbar-hide pb-10">
+            
+            <div class="scene">
+                <div id="flip-container" class="flip-container">
+                    <!-- FRONT: QUOTE CAROUSEL -->
+                    <div id="hero-card" class="card-front w-full min-h-[420px] shadow-none flex flex-col p-8 md:p-12 text-center group overflow-hidden transition-all duration-500 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500 animate-gradient" onmouseenter="pauseTimer()" onmouseleave="resumeTimer()">
+                        <div class="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E');"></div>
+                        <div class="absolute top-6 left-6 flex gap-2 z-20 transition-opacity duration-300">
+                            <button onclick="prevQuote()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                            <button onclick="nextQuoteManual()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                        </div>
+                        <div class="absolute top-6 right-6 flex gap-2 z-20 transition-opacity duration-300">
+                            <button onclick="toggleHeartCurrent()" id="rotator-heart" class="p-2 rounded-full bg-white/10 hover:bg-white/30 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></button>
+                            <button onclick="nextQuoteManual()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><line x1="21" y1="16" x2="21" y2="21"></line><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg></button>
+                        </div>
+                        <div class="relative z-10 flex-1 flex items-center justify-center w-full pt-8">
+                            <div id="quote-wrapper" class="quote-wrapper"></div>
+                        </div>
+                        <div class="absolute bottom-6 right-6 z-20">
+                            <svg class="progress-ring" width="24" height="24">
+                                <circle class="text-white/20" stroke="currentColor" stroke-width="2" fill="transparent" r="10" cx="12" cy="12"/>
+                                <circle id="progress-circle" class="text-white/80 progress-ring__circle" stroke="currentColor" stroke-width="2" fill="transparent" r="10" cx="12" cy="12" stroke-dasharray="62.83" stroke-dashoffset="0"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- BACK: BOOK SUMMARY -->
+                    <div id="book-card" class="card-back w-full bg-white border-x border-t border-gray-200 shadow-none overflow-y-auto scrollbar-hide">
+                        <div class="max-w-2xl text-center flex flex-col items-center gap-6">
+                            <div class="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600 uppercase tracking-widest">Deep Dive Mode</div>
+                            <h2 id="flip-book-title" class="text-3xl md:text-4xl font-serif font-bold text-gray-900 leading-tight"></h2>
+                            <p id="flip-book-author" class="text-sm font-semibold text-gray-400 uppercase tracking-widest">— </p>
+                            <div class="w-12 h-0.5 bg-gray-100 my-2"></div>
+                            <div id="flip-chapter-content" class="text-left space-y-4">
+                                <!-- CHAPTER SUMMARY INJECTED HERE -->
+                            </div>
+                            <button onclick="flipBack()" class="mt-8 px-6 py-2 rounded-full border border-gray-200 text-xs font-bold uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-colors">Back to Insights</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION TRAY -->
+            <div id="detail-view" class="group bg-white rounded-t-none rounded-b-2xl border-x border-b border-gray-200 shadow-lg relative -mt-6 z-10 w-full flex flex-col">
+                <div onclick="toggleDetail(event)" class="detail-fixed-header w-full h-14 flex items-center justify-between px-6 cursor-pointer hover:bg-gray-50 transition-colors bg-white z-20">
+                    <div class="flex items-center gap-3">
+                        <span id="tray-title" class="text-sm font-semibold text-gray-900 tracking-tight"></span>
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100">
+                             <div class="w-1 h-1 rounded-full bg-indigo-400"></div>
+                             <span id="tray-category" class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"></span>
+                        </div>
+                    </div>
+                    <div class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100 transition-all transform group-[.detail-expanded]:rotate-180">
+                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
+
+                <div id="blueprint-content" class="detail-scroll-area p-8 pt-4">
+                    <div id="quote-tray-content" class="grid grid-cols-12 gap-8">
+                        <div class="col-span-12 lg:col-span-7 flex flex-col gap-8">
+                            <div class="p-6 rounded-2xl bg-gray-50/50 border border-gray-100 relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                                <h4 class="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Context & Application</h4>
+                                <p id="detail-summary" class="text-base font-medium text-gray-700 leading-relaxed"></p>
+                            </div>
+                            <div class="flex flex-col gap-4 mt-4">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">All Insights From Book</h4>
+                                <ul id="detail-quotes" class="flex flex-col"></ul>
+                            </div>
+                        </div>
+                        <div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+                            <div class="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm flex flex-col gap-6">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Source Blueprint</h4>
+                                <div class="flex flex-col gap-4">
+                                    <div class="flex justify-between items-end border-b border-gray-50 pb-3">
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Architect</p>
+                                            <p id="detail-author" class="text-sm font-bold text-gray-900"></p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Leverage Type</p>
+                                            <p id="detail-leverage" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md inline-block"></p>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Primary Objective</p>
+                                            <p id="detail-objective" class="text-xs text-gray-600 leading-relaxed font-medium"></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Key Constraint</p>
+                                            <p id="detail-constraint" class="text-xs text-gray-600 leading-relaxed font-medium"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <a id="spotify-link" href="#" target="_blank" onclick="event.stopPropagation()" class="flex items-center justify-center gap-2 w-full py-3 bg-[#1DB954] text-white rounded-xl hover:bg-[#1ed760] transition-all shadow-md text-xs font-bold tracking-wide">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                    Listen on Spotify
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- CHAPTER TRAY CONTENT -->
+                    <div id="chapter-tray-content" class="hidden grid grid-cols-12 gap-8">
+                         <div class="col-span-12 lg:col-span-4 flex flex-col gap-4">
+                            <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">Chapters</h4>
+                            <div id="chapter-list" class="flex flex-col gap-2"></div>
+                         </div>
+                         <div class="col-span-12 lg:col-span-8">
+                            <div class="p-8 rounded-2xl bg-gray-50/50 border border-gray-100 min-h-[300px]">
+                                <h4 id="active-chapter-title" class="text-sm font-bold text-indigo-600 uppercase tracking-widest mb-4">Select a Chapter</h4>
+                                <p id="active-chapter-summary" class="text-lg font-medium text-gray-700 leading-relaxed"></p>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="order-2 md:order-1 col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col gap-3 shrink-0">
+                <div class="relative group">
+                    <input type="text" id="library-search" oninput="handleSearch(this.value)" placeholder="Search wisdom..." class="w-full bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 text-xs outline-none">
+                    <svg class="absolute left-2.5 top-2.5 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="setFilter('all')" id="filter-all" class="flex-1 py-1 text-[10px] font-bold uppercase rounded-md bg-gray-900 text-white shadow-sm transition-all">Library</button>
+                    <button onclick="setFilter('favorites')" id="filter-favorites" class="flex-1 py-1 text-[10px] font-medium uppercase rounded-md text-gray-500 hover:bg-gray-50 transition-all">Saved</button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between px-1 relative">
+                <div class="relative group/filter">
+                    <button onclick="toggleFilterPane()" id="active-context-count" class="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                        All Topics <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="filter-pane" class="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-xl z-50 hidden opacity-0 transition-all duration-200 transform scale-95 origin-top-left">
+                        <div class="p-3 border-b border-gray-50 flex justify-between items-center">
+                            <span class="text-[9px] font-bold uppercase tracking-widest text-gray-400">Filter Topics</span>
+                            <button onclick="toggleFilterPane()" class="text-[9px] font-bold text-indigo-500">Close</button>
+                        </div>
+                        <div id="filter-checkbox-list" class="p-2 max-h-64 overflow-y-auto scrollbar-hide"></div>
+                    </div>
+                </div>
+                <button onclick="toggleAddModal()" class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200" title="Add Book">
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Add Book</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            <div id="library-list" class="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-hide pb-20"></div>
+        </aside>
+    </main>
+
+    <div id="add-modal" class="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 hidden flex items-center justify-center transition-opacity duration-200 opacity-0">
+        <div class="bg-white w-full max-w-lg p-8 rounded-2xl border border-gray-200 shadow-2xl transform scale-95 transition-transform duration-200">
+            <h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Add to Library</h3>
+            <form id="add-form" class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" id="input-title" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Title" required>
+                    <input type="text" id="input-author" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Author" required>
+                </div>
+                <select id="input-category" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm"><option>Strategy</option><option>Wealth</option><option>Focus</option><option>Creativity</option><option>Mindset</option><option>Psychology</option></select>
+                <textarea id="input-summary" rows="2" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Summary"></textarea>
+                <textarea id="input-quotes" rows="4" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Quotes (Line separated)"></textarea>
+                <div class="pt-2 flex gap-2">
+                    <button type="submit" class="flex-1 py-2.5 text-sm font-semibold text-white bg-gray-900 rounded-lg">Save</button>
+                    <button type="button" onclick="toggleAddModal()" class="flex-1 py-2.5 text-sm font-semibold text-gray-500 bg-gray-100 rounded-lg">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50"></div>
+
+    <script>
+        const starterLibrary=[
+        {id:1,title:"$100M Offers",author:"Alex Hormozi",category:"Strategy",quotes:[{text:"Make people an offer so good they would feel stupid saying no.",context:"The 'Grand Slam Offer' solves the conversion problem by making the value-to-price ratio so skewed that refusing feels irrational. Instead of competing on price, you compete on value and perceived likelihood of achievement. Audit your business: are you selling a commodity (gym sessions) or a transformation (6-week reset)? Transformations are compared on desire, not price."}, {text:"Volume negates luck.",context:"Establish a baseline of reality by doubling your output volume for 30 days. High reps let the math work in your favor. Most entrepreneurs fail because they quit before the volume requirement of the market is met."}, {text:"Attention is the new currency.",context:"In the modern economy, leverage starts with eyes. Build the mechanism to capture the market's attention before investing in the final product. If no one knows you exist, your solution is irrelevant."}]},
+        {id:2,title:"Atomic Habits",author:"James Clear",category:"Focus",chapters:[{title:"The Surprising Power of Atomic Habits",summary:"Tiny changes, remarkable results. 1% better every day leads to massive compounding over time."}, {title:"How Your Habits Shape Your Identity",summary:"The most effective way to change your habits is to focus not on what you want to achieve, but on who you wish to become."}, {title:"The Four Laws of Behavior Change",summary:"Make it obvious, make it attractive, make it easy, make it satisfying."}],quotes:[{text:"You do not rise to the level of your goals. You fall to the level of your systems.",context:"Goals are about results; systems are about processes. Growth-minded people focus on identity-engineering. Engineering your environment (e.g. putting a journal on your pillow) beat willpower every time."}, {text:"Habits are the compound interest of self-improvement.",context:"1% daily improvements result in being 37x better in a year. Compounding is a slow process that produces massive late-stage results. Stop looking for breakthroughs; start looking for tiny wins."}]},
+        {id:3,title:"Psychology of Money",author:"Morgan Housel",category:"Wealth",quotes:[{text:"Wealth is what you don't see.",context:"Wealth is an option not yet exercised to buy something later. Shift your focus from high income (which is visible) to high-rate assets (which are invisible) for absolute autonomy and flexibility."}, {text:"Save money. Just save it.",context:"Saving is a hedge against life's ability to surprise you. high savings rates buy you the 'margin of safety' required to stay in the game when things go wrong."}]},
+        {id:4,title:"Deep Work",author:"Cal Newport",category:"Focus",quotes:[{text:"Deep work is the superpower of the 21st century.",context:"Cognitive intensity pushed to the limit creates rare, hard-to-replicate value. In an increasingly distracted world, the ability to concentrate deeply is a high-leverage asset. Application: Block 4 hours of monastic time daily."}, {text:"Drain the shallows.",context:"Shallow work is non-cognitively demanding and easy to replicate. If you spend 80% of your day in the 'shallows' (emails, meetings), you are vulnerable to automation and market stagnation."}]},
+        {id:5,title:"The Creative Act",author:"Rick Rubin",category:"Creativity",quotes:[{text:"The universe is not static.",context:"Creativity is a fundamental way of being. It requires radical receptivity to signals around you. Reflect personal truth over market trends for a more elegant, resilient business solution."}, {text:"We are all creators.",context:"Art is a form of service. Revenue is a trailing metric of how well you performed the creative act. approach your business systems with the same care an artist gives to their masterpiece."}]},
+        {id:6,title:"Antifragile",author:"Nassim Taleb",category:"Strategy",quotes:[{text:"Wind extinguishes a candle and energizes fire.",context:"Antifragile systems grow from stressors. build a business structure that gains strength from market volatility. The goal isn't just to survive chaos, but to profit from it."}, {text:"Avoid the middle.",context:"The Barbell Strategy: Play it very safe in 90% of your life and business, then take aggressive, high-upside swings with 10%."}]},
+        {id:7,title:"Essentialism",author:"Greg McKeown",category:"Focus",quotes:[{text:"If it isn't a clear yes, then it's a clear no.",context:"The disciplined pursuit of less. Clear out 'good' opportunities to make room for the truly 'great' ones. If a task doesn't contribute to your North Star goals, strike it off immediately."}, {text:"Less but better.",context:"Contribution requires subtraction. Identify the one thing that makes everything else easier or unnecessary, and devote 80% of your energy to that single move."}]},
+        {id:8,title:"Influence",author:"Robert Cialdini",category:"Psychology",quotes:[{text:"Social proof is powerful.",context:"Humans look to others for correct behavior. Testimonials are the core logic of the sale, not an extra. Build systems that naturally surfaced the success stories of your existing clients."}, {text:"Reciprocity is a key driver.",context:"Lead with genuine value. Trigger the psychological need for repayment by solving problems for free first. Conversion happens naturally when the value-to-ask ratio is high."}]},
+        {id:9,title:"The War of Art",author:"Steven Pressfield",category:"Mindset",quotes:[{text:"The amateur plays for fun. The professional plays for keeps.",context:"Success is showing up on a professional schedule when you don't feel like it. Treat your personal business ventures with the same rigor you'd treat a high-paying client project."}, {text:"Start before you are ready.",context:"Resistance uses perfectionism as a weapon to keep you stagnant. Launch the 'Minimum Viable version' today. Market feedback is the only data that matters."}]},
+        {id:10,title:"Zero to One",author:"Peter Thiel",category:"Strategy",quotes:[{text:"Competition is for losers.",context:"creating moves the world from 0 to 1. Find a secret truth few people agree with you on and build a vertical advantage around it to avoid the red-ocean traps."}, {text:"Sales matters just as much as product.",context:"Distribution is everything. Spend 50% of your time on the product and 50% on the distribution systems. world-class distribution beats a perfect product no one knows about."}]}
+        ];
+
+        const metaData = {
+            1: { leverage: "Systems", obj: "De-coupling time from revenue.", con: "Commodity pricing models." },
+            2: { leverage: "Identity", obj: "Exponential compounding of micro-habits.", con: "Relying on willpower." },
+            3: { leverage: "Behavioral", obj: "Building autonomy through assets.", con: "Social signaling desire." },
+            4: { leverage: "Cognitive", obj: "Creating high-value rare output.", con: "Digital distraction trap." },
+            5: { leverage: "Creative", obj: "Work as a form of service.", con: "Focusing on audience expectations." },
+            6: { leverage: "Systems", obj: "Structures that gain from volatility.", con: "Fragile corporate models." },
+            7: { leverage: "Strategic", obj: "Maximizing contribution via focus.", con: "Disciplined pursuit of less." },
+            8: { leverage: "Psychology", obj: "Influence via cognitive triggers.", con: "Lack of reciprocity in funnels." },
+            9: { leverage: "Creative", obj: "Defeating internal Resistance.", con: "Treating projects as a hobby." },
+            10: { leverage: "Capital", obj: "Vertical progress via secrets.", con: "Horizontal red-ocean competition." }
+        };
+
+        let favorites = JSON.parse(localStorage.getItem('mojo_fav_v60')) || [];
+        let quoteQueue = [];
+        let currentQuoteIndex = 0;
+        let activeCategories = [];
+        let isPaused = false;
+        let isTrayOpen = false;
+        let isTransitioning = false;
+        let rotatorInterval;
+        let timeLeft = 100;
+        const DURATION = 10000;
+
+        function saveState() { localStorage.setItem('mojo_fav_v60', JSON.stringify(favorites)); }
+
+        function init() {
+            buildQuoteQueue();
+            renderLibrary('all');
+            if(quoteQueue.length > 0) updateQuoteDOM(quoteQueue[0]);
+            startRotator();
+        }
+
+        function buildQuoteQueue() {
+            quoteQueue = [];
+            starterLibrary.forEach(book => {
+                if(activeCategories.length === 0 || activeCategories.includes(book.category)) {
+                    book.quotes.forEach(qObj => {
+                        const isFav = favorites.includes(qObj.text);
+                        const item = { text: qObj.text, context: qObj.context, author: book.author, title: book.title, category: book.category, bookId: book.id, fav: isFav };
+                        if(isFav) { quoteQueue.push(item); quoteQueue.push(item); }
+                        quoteQueue.push(item);
+                    });
+                }
+            });
+            quoteQueue.sort(() => Math.random() - 0.5);
+            updateFilterLabel();
+        }
+
+        function updateFilterLabel() {
+            const countEl = document.getElementById('active-context-count');
+            if (activeCategories.length === 0) {
+                countEl.innerHTML = `All Topics <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+                countEl.className = "text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1.5";
+            } else {
+                countEl.innerHTML = `${activeCategories.length} Topics Active <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+                countEl.className = "text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1.5";
+            }
+        }
+
+        function toggleFilterPane() {
+            const pane = document.getElementById('filter-pane');
+            if(pane.classList.contains('hidden')) {
+                renderFilterList(); pane.classList.remove('hidden');
+                setTimeout(() => { pane.classList.remove('opacity-0', 'scale-95'); }, 10);
+            } else {
+                pane.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => { pane.classList.add('hidden'); }, 200);
+            }
+        }
+
+        function renderFilterList() {
+            const list = document.getElementById('filter-checkbox-list');
+            const cats = [...new Set(starterLibrary.map(b => b.category))].sort();
+            list.innerHTML = '';
+            
+            // Clear All Option
+            const clearLabel = document.createElement('div');
+            clearLabel.className = "flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-all border border-transparent hover:border-rose-100 mb-1 group";
+            clearLabel.innerHTML = `<div class="w-4 h-4 rounded border border-gray-200 bg-white flex items-center justify-center group-hover:border-rose-300"><svg class="w-2.5 h-2.5 text-rose-500 opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div><span class="text-[10px] font-bold uppercase text-gray-400 group-hover:text-rose-600">Clear All</span>`;
+            clearLabel.onclick = (e) => { e.stopPropagation(); clearFilters(); };
+            list.appendChild(clearLabel);
+
+            cats.forEach(c => {
+                const active = activeCategories.includes(c);
+                const label = document.createElement('div');
+                label.className = "flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-all";
+                label.innerHTML = `<div class="w-4 h-4 rounded border ${active ? 'bg-indigo-500 border-indigo-500' : 'border-gray-200 bg-white'} flex items-center justify-center">${active ? '<svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}</div><span class="text-[11px] font-semibold ${active ? 'text-gray-900' : 'text-gray-500'}">${c}</span>`;
+                label.onclick = (e) => { e.stopPropagation(); toggleCategoryFilter(c); };
+                list.appendChild(label);
+            });
+        }
+
+        function toggleCategoryFilter(c) {
+            if(activeCategories.includes(c)) activeCategories = activeCategories.filter(x => x !== c); else activeCategories.push(c);
+            buildQuoteQueue(); renderLibrary('all'); renderFilterList(); nextQuoteManual();
+        }
+
+        function clearFilters() { activeCategories = []; buildQuoteQueue(); renderLibrary('all'); renderFilterList(); nextQuoteManual(); }
+
+        window.addEventListener('click', (e) => {
+            const pane = document.getElementById('filter-pane');
+            const trigger = document.getElementById('active-context-count');
+            if(pane && !pane.contains(e.target) && !trigger.contains(e.target) && !pane.classList.contains('hidden')) toggleFilterPane();
+        });
+
+        function startRotator() {
+            if(rotatorInterval) clearInterval(rotatorInterval);
+            timeLeft = 100;
+            rotatorInterval = setInterval(() => {
+                if(!isPaused && !isTransitioning) {
+                    timeLeft -= (100 / (DURATION / 100));
+                    updateRing(timeLeft);
+                    if(timeLeft <= 0) { clearInterval(rotatorInterval); nextQuote(); }
+                }
+            }, 100);
+        }
+
+        function updateRing(p) {
+            const circle = document.getElementById('progress-circle');
+            const circumference = 10 * 2 * Math.PI;
+            circle.style.strokeDashoffset = circumference - (p / 100) * circumference;
+        }
+
+        function nextQuote() { if(isTransitioning) return; currentQuoteIndex = (currentQuoteIndex + 1) % quoteQueue.length; transitionQuote(); }
+        function prevQuote() { if(isTransitioning) return; currentQuoteIndex = (currentQuoteIndex - 1 + quoteQueue.length) % quoteQueue.length; transitionQuote(); }
+        function nextQuoteManual() { if(isTransitioning) return; clearInterval(rotatorInterval); nextQuote(); }
+
+        function transitionQuote() {
+            isTransitioning = true;
+            const wrapper = document.getElementById('quote-wrapper');
+            const newQ = quoteQueue[currentQuoteIndex];
+            const slide = document.createElement('div');
+            slide.className = 'quote-slide active flex flex-col items-center';
+            slide.innerHTML = buildSlideHTML(newQ);
+            
+            updateTrayUI(newQ);
+            wrapper.appendChild(slide);
+            void slide.offsetWidth;
+            
+            slide.classList.add('active');
+            const slides = wrapper.querySelectorAll('.quote-slide');
+            slides.forEach(s => {
+                if(s !== slide) {
+                    s.classList.remove('active');
+                    setTimeout(() => { if(s.parentNode === wrapper) wrapper.removeChild(s); }, 1400);
+                }
+            });
+            updateHeartUI(newQ);
+            setTimeout(() => { 
+                isTransitioning = false; 
+                // 2. Only resume the rotator if the tray is CLOSED
+                if(!isPaused && !isTrayOpen) startRotator(); 
+            }, 1400);
+        }
+
+        function updateQuoteDOM(q) {
+            const wrapper = document.getElementById('quote-wrapper');
+            const slide = document.createElement('div');
+            slide.className = 'quote-slide active flex flex-col items-center';
+            slide.innerHTML = buildSlideHTML(q);
+            updateTrayUI(q);
+            wrapper.appendChild(slide);
+            updateHeartUI(q);
+        }
+
+        function buildSlideHTML(q) {
+            const len = q.text.length;
+            let sizeClass = "text-4xl md:text-5xl lg:text-6xl";
+            let whitespaceClass = "text-balance";
+            
+            if(len < 25) {
+                whitespaceClass = "whitespace-nowrap";
+            }
+            
+            if(len > 120) sizeClass = "text-2xl md:text-3xl lg:text-4xl";
+            else if(len > 70) sizeClass = "text-3xl md:text-4xl lg:text-5xl";
+
+            return `
+                <div class="w-full px-6 md:px-12 flex justify-center">
+                    <div class="w-fit flex flex-col items-end max-w-4xl -translate-x-1">
+                        <div class="flex items-start">
+                            <span class="font-serif text-white opacity-60 text-4xl md:text-6xl mr-3 select-none leading-none mt-0.5">“</span>
+                            <h2 class="quote-text font-serif font-medium text-white tracking-tight leading-relaxed drop-shadow-md transition-all duration-300 text-left ${sizeClass} ${whitespaceClass}">
+                                ${cleanText(q.text)}<span class="opacity-60 ml-1 tracking-tighter select-none">”</span>
+                            </h2>
+                        </div>
+                        <div onclick="jumpToBookContext()" class="quote-author mt-6 cursor-pointer group/meta pr-2">
+                            <p class="text-sm font-bold text-white/90 group-hover/meta:text-white transition-colors tracking-wide">— ${q.author}</p>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function updateTrayUI(q) {
+            document.getElementById('tray-category').textContent = q.category;
+            document.getElementById('tray-title').textContent = q.title;
+            document.getElementById('detail-summary').textContent = q.context;
+            const book = starterLibrary.find(b => b.id === q.bookId);
+            if(book) injectBlueprint(book);
+        }
+
+        function injectBlueprint(book) {
+            document.getElementById('detail-author').innerText = book.author;
+            document.getElementById('spotify-link').href = `https://open.spotify.com/search/${encodeURIComponent(book.title + " " + book.author)}`;
+            const meta = metaData[book.id];
+            document.getElementById('detail-leverage').innerText = meta.leverage;
+            document.getElementById('detail-objective').innerText = meta.obj;
+            document.getElementById('detail-constraint').innerText = meta.con;
+            
+            const list = document.getElementById('detail-quotes');
+            list.innerHTML = '';
+            book.quotes.forEach((qObj, i) => {
+                const isF = favorites.includes(qObj.text);
+                const li = document.createElement('li');
+                li.className = `group/quote flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50/50 px-2 transition-colors ${i !== book.quotes.length - 1 ? 'border-b border-gray-100' : ''}`;
+                
+                li.innerHTML = `
+                    <div class="quote-nav-trigger flex-1 text-sm text-gray-700 italic leading-relaxed pr-4">“${qObj.text}”</div>
+                    <div class="heart-trigger w-10 h-10 flex items-center justify-center shrink-0 transition-colors ${isF ? 'text-rose-500' : 'text-gray-200 hover:text-rose-400'}">
+                        <svg class="w-4 h-4" fill="${isF ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+                    </div>`;
+
+                li.querySelector('.quote-nav-trigger').onclick = (e) => {
+                    e.stopPropagation();
+                    const targetIdx = quoteQueue.findIndex(item => item.text === qObj.text);
+                    if (targetIdx !== -1) {
+                        currentQuoteIndex = targetIdx;
+                        transitionQuote();
+                        showToast("Perspective Swapped");
+                        // 1. Scroll back up to the top of the tray to see Context & Application
+                        const scrollArea = document.getElementById('blueprint-content');
+                        if (scrollArea) {
+                            scrollArea.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                    }
+                };
+
+                li.querySelector('.heart-trigger').onclick = (e) => {
+                    e.stopPropagation();
+                    if(favorites.includes(qObj.text)) favorites = favorites.filter(f => f !== qObj.text); else favorites.push(qObj.text);
+                    saveState(); injectBlueprint(book); buildQuoteQueue(); updateHeartUI(quoteQueue[currentQuoteIndex]);
+                };
+
+                list.appendChild(li);
+            });
+        }
+
+        function updateHeartUI(q) {
+            const btn = document.getElementById('rotator-heart');
+            const svg = btn.querySelector('svg');
+            if(favorites.includes(q.text)) {
+                btn.classList.add('bg-white/30');
+                svg.setAttribute('fill', 'white'); svg.setAttribute('stroke', 'white');
+            } else {
+                btn.classList.remove('bg-white/30');
+                svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor');
+            }
+        }
+
+        function toggleHeartCurrent() {
+            const q = quoteQueue[currentQuoteIndex];
+            if(favorites.includes(q.text)) favorites = favorites.filter(f => f !== q.text); else favorites.push(q.text);
+            saveState(); updateHeartUI(q); buildQuoteQueue();
+        }
+
+        function toggleDetail(e) {
+            const view = document.getElementById('detail-view');
+            isTrayOpen = !isTrayOpen;
+            if(isTrayOpen) { 
+                view.classList.add('detail-expanded'); 
+                isPaused = true; 
+                if(rotatorInterval) clearInterval(rotatorInterval);
+            } 
+            else { 
+                view.classList.remove('detail-expanded'); 
+                isPaused = false; 
+                startRotator(); 
+            }
+        }
+
+        function jumpToBookContext() {
+            const q = quoteQueue[currentQuoteIndex];
+            const book = starterLibrary.find(b => b.title === q.title);
+            if (book) { showDetail(book); document.getElementById('detail-view').scrollIntoView({ behavior: 'smooth' }); }
+        }
+
+        function flipBack() {
+            const view = document.getElementById('detail-view');
+            
+            // 1. Collapse the tray first
+            view.classList.remove('detail-expanded');
+            isTrayOpen = false;
+            
+            // 2. Wait for collapse, then flip card and restore carousel UI
+            setTimeout(() => {
+                document.getElementById('flip-container').classList.remove('is-flipped');
+                document.getElementById('quote-tray-content').classList.remove('hidden');
+                document.getElementById('chapter-tray-content').classList.add('hidden');
+                
+                // Restore tray header to current carousel quote
+                const currentQ = quoteQueue[currentQuoteIndex];
+                updateTrayUI(currentQ);
+                
+                isPaused = false;
+                startRotator();
+            }, 600);
+        }
+
+        function showDetail(book) {
+            const view = document.getElementById('detail-view');
+            const flipContainer = document.getElementById('flip-container');
+
+            // IF BOOK HAS CHAPTERS -> FLIP SYSTEM
+            if (book.chapters) {
+                isPaused = true;
+                clearInterval(rotatorInterval);
+                
+                // Helper to perform the flip and expand
+                const performFlip = () => {
+                    // Update the Tray Header for the Flipped State
+                    document.getElementById('tray-title').textContent = book.title;
+                    document.getElementById('tray-category').textContent = book.category;
+
+                    document.getElementById('flip-book-title').textContent = book.title;
+                    document.getElementById('flip-book-author').textContent = "— " + book.author;
+                    
+                    // Load Chapters into Tray
+                    const trayList = document.getElementById('chapter-list');
+                    trayList.innerHTML = '';
+                    book.chapters.forEach((ch, i) => {
+                        const btn = document.createElement('button');
+                        btn.className = "w-full text-left px-4 py-3 rounded-xl border border-gray-100 hover:bg-gray-50 transition-all text-xs font-bold text-gray-500 hover:text-gray-900 uppercase tracking-wide";
+                        btn.textContent = ch.title;
+                        btn.onclick = () => {
+                            document.getElementById('active-chapter-title').textContent = ch.title;
+                            document.getElementById('active-chapter-summary').textContent = ch.summary;
+                            document.getElementById('flip-chapter-content').innerHTML = `<p class="text-white/80 italic font-serif text-lg leading-relaxed">"${ch.summary}"</p>`;
+                            trayList.querySelectorAll('button').forEach(b => b.classList.remove('bg-indigo-50', 'border-indigo-100', 'text-indigo-600'));
+                            btn.classList.add('bg-indigo-50', 'border-indigo-100', 'text-indigo-600');
+                        };
+                        trayList.appendChild(btn);
+                        if(i === 0) btn.click();
+                    });
+
+                    flipContainer.classList.add('is-flipped');
+                    document.getElementById('quote-tray-content').classList.add('hidden');
+                    document.getElementById('chapter-tray-content').classList.remove('hidden');
+                    
+                    // Delay expansion slightly to let flip finish
+                    setTimeout(() => {
+                        view.classList.add('detail-expanded');
+                        isTrayOpen = true;
+                    }, 400);
+                };
+
+                if (isTrayOpen) {
+                    // Scenario 2: Collapse first, then flip and expand
+                    view.classList.remove('detail-expanded');
+                    isTrayOpen = false;
+                    setTimeout(performFlip, 600); // Wait for collapse transition
+                } else {
+                    // Scenario 1: Flip and expand
+                    performFlip();
+                }
+                
+            } else {
+                // NORMAL QUOTE JUMP (Non-Chapter Books)
+                const performJump = () => {
+                    injectBlueprint(book);
+                    document.getElementById('tray-title').textContent = book.title;
+                    document.getElementById('tray-category').textContent = book.category;
+                    document.getElementById('detail-summary').textContent = book.quotes[0].context;
+                    view.classList.add('detail-expanded');
+                    isTrayOpen = true;
+                    isPaused = true;
+                    clearInterval(rotatorInterval);
+                };
+
+                if (isTrayOpen) {
+                    view.classList.remove('detail-expanded');
+                    isTrayOpen = false;
+                    setTimeout(performJump, 600);
+                } else {
+                    performJump();
+                }
+            }
+        }
+
+        function renderLibrary(filter) {
+            const list = document.getElementById('library-list');
+            list.innerHTML = '';
+            const books = (filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(q => favorites.includes(q.text)))).filter(b => activeCategories.length === 0 || activeCategories.includes(b.category));
+            const cats = {};
+            books.forEach(b => { if(!cats[b.category]) cats[b.category] = []; cats[b.category].push(b); });
+            Object.keys(cats).sort().forEach(c => {
+                const active = activeCategories.includes(c);
+                const tile = document.createElement('details');
+                tile.open = true;
+                tile.className = "category-tile bg-white rounded-xl border border-gray-100 mb-3 overflow-hidden transition-all";
+                tile.innerHTML = `<summary class="flex items-center justify-between px-3 py-3 cursor-pointer select-none"><span class="category-name text-[10px] font-bold uppercase tracking-widest ${active ? 'text-indigo-600' : 'text-gray-500'} hover:text-indigo-500 transition-colors">${c}</span><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-gray-300">${cats[c].length}</span><div class="category-chevron w-4 h-4 transition-transform duration-300"><svg class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div></summary>`;
+                const bookDiv = document.createElement('div');
+                bookDiv.className = "px-1 pb-2 space-y-1 border-t border-gray-50 pt-2";
+                cats[c].forEach(b => {
+                    const item = document.createElement('div');
+                    item.className = "px-3 py-2 text-[12px] text-gray-700 truncate cursor-pointer hover:bg-gray-50 rounded-lg";
+                    item.textContent = b.title;
+                    item.onclick = () => showDetail(b);
+                    bookDiv.appendChild(item);
+                });
+                tile.appendChild(bookDiv); list.appendChild(tile);
+            });
+        }
+
+        function setFilter(type) {
+            document.getElementById('filter-all').className = type === 'all' ? "flex-1 py-1.5 text-[11px] font-bold uppercase rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200" : "flex-1 py-1.5 text-[11px] font-medium uppercase text-gray-500 hover:text-gray-700";
+            document.getElementById('filter-favorites').className = type === 'favorites' ? "flex-1 py-1.5 text-[11px] font-bold uppercase rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200" : "flex-1 py-1.5 text-[11px] font-medium uppercase text-gray-500 hover:text-gray-700";
+            renderLibrary(type);
+        }
+
+        function handleSearch(val) {
+            const query = val.toLowerCase();
+            const list = document.getElementById('library-list');
+            const filter = document.getElementById('filter-favorites').classList.contains('text-gray-900') ? 'favorites' : 'all';
+            let books = filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(x => favorites.includes(x.text)));
+            if(query) books = books.filter(b => b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query) || b.category.toLowerCase().includes(query));
+            list.innerHTML = '';
+            const cats = {};
+            books.forEach(b => { if(!cats[b.category]) cats[b.category] = []; cats[b.category].push(b); });
+            Object.keys(cats).sort().forEach(c => {
+                const tile = document.createElement('details'); tile.open = true; tile.className = "bg-white rounded-xl border border-gray-100 mb-3 overflow-hidden";
+                tile.innerHTML = `<summary class="flex items-center justify-between px-3 py-3 cursor-pointer select-none"><span class="text-[10px] font-bold uppercase tracking-widest text-gray-500">${c}</span><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-gray-300">${cats[c].length}</span><div class="w-4 h-4"><svg class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div></summary>`;
+                const bookDiv = document.createElement('div');
+                bookDiv.className = "px-1 pb-2 space-y-1 border-t border-gray-50 pt-2";
+                cats[c].forEach(b => {
+                    const item = document.createElement('div');
+                    item.className = "px-3 py-2 text-[12px] text-gray-700 truncate cursor-pointer hover:bg-gray-50 rounded-lg";
+                    item.textContent = b.title;
+                    item.onclick = () => showDetail(b);
+                    bookDiv.appendChild(item);
+                });
+                tile.appendChild(bookDiv); list.appendChild(tile);
+            });
+        }
+
+        function toggleAddModal() {
+            const modal = document.getElementById('add-modal');
+            if(modal.classList.contains('hidden')) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); }
+            else { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); }
+        }
+
+        function pauseTimer() { isPaused = true; }
+        function resumeTimer() { isPaused = false; }
+        function cleanText(text) { return text.replace(/"/g, '').replace(/'/g, '’').replace(/\.\.\./g, '…'); }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2000);
+        }
+
+        document.getElementById('add-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const newBook = { id: Date.now(), title: document.getElementById('input-title').value, author: document.getElementById('input-author').value, category: document.getElementById('input-category').value, summary: document.getElementById('input-summary').value, quotes: document.getElementById('input-quotes').value.split('\n').filter(line => line.trim() !== '').map(q => ({ text: q, context: "Self-added insight." })) };
+            starterLibrary.unshift(newBook); buildQuoteQueue(); renderLibrary('all'); toggleAddModal(); e.target.reset();
+        });
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

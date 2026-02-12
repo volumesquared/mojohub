@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MojoHub 3.2 | Studio Flip</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        .text-balance { text-wrap: balance; }
+
+        @keyframes hueCycle { 0% { filter: hue-rotate(0deg) saturate(1.1); } 50% { filter: hue-rotate(180deg) saturate(1.2); } 100% { filter: hue-rotate(360deg) saturate(1.1); } }
+        @keyframes gradientPulse { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .animate-gradient { background: linear-gradient(125deg, #4f46e5, #7c3aed, #db2777, #2563eb); background-size: 300% 300%; animation: gradientPulse 30s ease-in-out infinite, hueCycle 90s linear infinite; }
+
+        .quote-wrapper { position: relative; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .quote-slide { position: absolute; width: 100%; opacity: 0; transform: scale(0.95) translateY(20px); pointer-events: none; transition: opacity 1.4s ease-in-out, transform 1.4s ease-in-out; will-change: opacity, transform; }
+        .quote-slide.active { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; z-index: 10; }
+        .quote-slide .quote-author { opacity: 0; transform: translateY(8px); transition: opacity 1.4s ease-out, transform 1.4s ease-out; transition-delay: 300ms; }
+        .quote-slide.active .quote-author { opacity: 1; transform: translateY(0); }
+        
+        .progress-ring__circle { transition: stroke-dashoffset 0.1s linear; transform: rotate(-90deg); transform-origin: 50% 50%; }
+
+        /* REFINED TRAY ARCHITECTURE */
+        #detail-view { height: 56px; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease; overflow: hidden; display: flex; flex-direction: column; }
+        #detail-view.detail-expanded { height: 85vh; }
+        #detail-view.synopsis-mode { height: 0; opacity: 0; margin-top: 0; border: none; pointer-events: none; }
+        .detail-fixed-header { flex-shrink: 0; }
+        .detail-scroll-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+        /* FLIP SYSTEM */
+        .scene { perspective: 2000px; width: 100%; position: relative; min-height: 420px; z-index: 20; transition: min-height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+        .scene.expanded-scene { min-height: 85vh; }
+        .flip-container { position: relative; width: 100%; height: 100%; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
+        .is-flipped { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; top: 0; left: 0; border-radius: 1rem 1rem 0 0; overflow: hidden; }
+        .card-front { z-index: 2; position: relative; border-radius: 1rem 1rem 0 0; }
+        .card-back { transform: rotateY(180deg); z-index: 1; display: flex; flex-direction: column; background: white; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 1rem; }
+
+        /* CUSTOM SCROLLBAR FOR CONTENT AREA */
+        .content-scroll::-webkit-scrollbar { width: 6px; }
+        .content-scroll::-webkit-scrollbar-track { background: transparent; }
+        .content-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+        .content-scroll::-webkit-scrollbar-thumb:hover { background: #d1d5db; }
+        .content-scroll { scrollbar-width: thin; scrollbar-color: #e5e7eb transparent; overflow-y: auto !important; -webkit-overflow-scrolling: touch; position: relative; z-index: 40; }
+
+        summary::-webkit-details-marker { display: none !important; }
+        summary::marker { content: "" !important; display: none !important; }
+        details > summary { list-style: none !important; }
+        .category-tile[open] .category-chevron { transform: rotate(180deg); }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
+
+    <header class="w-full bg-white border-b border-gray-200 z-10 shrink-0 h-14">
+        <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex gap-1.5 opacity-40 hover:opacity-100 transition-opacity">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHub 3.2</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-6xl mx-auto w-full p-6 grid grid-cols-12 gap-6 overflow-hidden">
+        
+        <section class="order-1 md:order-2 col-span-12 md:col-span-8 lg:col-span-9 flex flex-col gap-6 h-full overflow-hidden pb-10">
+            
+            <div id="main-scene" class="scene shrink-0">
+                <div id="flip-container" class="flip-container">
+                    <!-- FRONT: QUOTE CAROUSEL -->
+                    <div id="hero-card" class="card-front w-full min-h-[420px] shadow-none flex flex-col p-8 md:p-12 text-center group transition-all duration-500 bg-gradient-to-br from-indigo-600 via-purple-600 to-rose-500 animate-gradient" onmouseenter="pauseTimer()" onmouseleave="resumeTimer()">
+                        <div class="absolute inset-0 opacity-20 pointer-events-none mix-blend-overlay" style="background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E');"></div>
+                        <div class="absolute top-6 left-6 flex gap-2 z-20 transition-opacity duration-300">
+                            <button onclick="prevQuote()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                            <button onclick="nextQuoteManual()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                        </div>
+                        <div class="absolute top-6 right-6 flex gap-2 z-20 transition-opacity duration-300">
+                            <button onclick="toggleHeartCurrent()" id="rotator-heart" class="p-2 rounded-full bg-white/10 hover:bg-white/30 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></button>
+                            <button onclick="nextQuoteManual()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition-colors backdrop-blur-md border border-white/10 shadow-sm"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><line x1="21" y1="16" x2="21" y2="21"></line><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg></button>
+                        </div>
+                        <div class="relative z-10 flex-1 flex items-center justify-center w-full pt-8">
+                            <div id="quote-wrapper" class="quote-wrapper"></div>
+                        </div>
+                        <div class="absolute bottom-6 right-6 z-20">
+                            <svg class="progress-ring" width="24" height="24">
+                                <circle class="text-white/20" stroke="currentColor" stroke-width="2" fill="transparent" r="10" cx="12" cy="12"/>
+                                <circle id="progress-circle" class="text-white/80 progress-ring__circle" stroke="currentColor" stroke-width="2" fill="transparent" r="10" cx="12" cy="12" stroke-dasharray="62.83" stroke-dashoffset="0"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- BACK: INTEGRATED DEEP DIVE CARD -->
+                    <div id="book-card" class="card-back w-full bg-white flex flex-col">
+                        <!-- STICKY HEADER -->
+                        <div class="shrink-0 px-8 py-6 border-b border-gray-50 flex items-start justify-between bg-white relative z-30">
+                            <div class="flex flex-col">
+                                <div id="flip-book-category" class="w-fit px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100 text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-4"></div>
+                                <h2 id="flip-book-title" class="text-2xl font-serif font-bold text-gray-900 tracking-tight leading-none mb-1.5"></h2>
+                                <p id="flip-book-author-line" class="text-[11px] font-semibold text-gray-400 uppercase tracking-widest"></p>
+                            </div>
+                            <button onclick="flipBack()" class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-100 hover:border-gray-200 hover:bg-gray-50 text-gray-300 hover:text-gray-900 transition-all shadow-sm" title="Close Deep Dive">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                        </div>
+                        <!-- SCROLLABLE BODY -->
+                        <div id="flip-scroll-area" class="flex-1 content-scroll p-8 pt-6">
+                            <div id="flip-chapter-content" class="text-left w-full">
+                                <!-- SYNOPSIS INJECTED HERE -->
+                            </div>
+                            <!-- INSIGHT TAIL SECTION -->
+                            <div class="mt-12 pt-8 border-t border-gray-100">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mb-6">Key Insights</h4>
+                                <ul id="flip-insights-list" class="flex flex-col"></ul>
+                            </div>
+                        </div>
+                        <!-- STICKY FOOTER -->
+                        <div class="shrink-0 p-3 border-t border-gray-50 bg-white flex justify-center">
+                            <a id="flip-spotify-link" href="#" target="_blank" class="flex items-center justify-center gap-2 px-6 py-2 bg-[#1DB954] text-white rounded-full hover:bg-[#1ed760] transition-all shadow-sm text-[11px] font-bold tracking-wide">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                Listen on Spotify
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ACTION TRAY (Carousel Mode) -->
+            <div id="detail-view" class="group bg-white rounded-t-none rounded-b-2xl border-x border-b border-gray-200 shadow-lg relative -mt-6 z-10 w-full flex flex-col">
+                <div onclick="toggleDetail(event)" class="detail-fixed-header w-full h-14 flex items-center justify-between px-6 cursor-pointer hover:bg-gray-50 transition-colors bg-white z-20">
+                    <div class="flex items-center gap-3">
+                        <span id="tray-title" class="text-sm font-semibold text-gray-900 tracking-tight"></span>
+                        <div class="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-50 border border-indigo-100">
+                             <div class="w-1 h-1 rounded-full bg-indigo-400"></div>
+                             <span id="tray-category" class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest"></span>
+                        </div>
+                    </div>
+                    <div class="w-6 h-6 flex items-center justify-center rounded-full bg-gray-50 border border-gray-100 transition-all transform group-[.detail-expanded]:rotate-180">
+                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                </div>
+
+                <div id="blueprint-content" class="detail-scroll-area p-8 pt-4">
+                    <div class="grid grid-cols-12 gap-8">
+                        <div class="col-span-12 lg:col-span-7 flex flex-col gap-8">
+                            <div class="p-6 rounded-2xl bg-gray-50/50 border border-gray-100 relative overflow-hidden">
+                                <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                                <h4 class="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em] mb-3">Context & Application</h4>
+                                <p id="detail-summary" class="text-base font-medium text-gray-700 leading-relaxed"></p>
+                            </div>
+                            <div class="flex flex-col gap-4 mt-4">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">All Insights From Book</h4>
+                                <ul id="detail-quotes" class="flex flex-col"></ul>
+                            </div>
+                        </div>
+                        <div class="col-span-12 lg:col-span-5 flex flex-col gap-6">
+                            <div class="p-6 rounded-2xl border border-gray-200 bg-white shadow-sm flex flex-col gap-6">
+                                <h4 class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Source Blueprint</h4>
+                                <div class="flex flex-col gap-4">
+                                    <div class="flex justify-between items-end border-b border-gray-50 pb-3">
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Architect</p>
+                                            <p id="detail-author" class="text-sm font-bold text-gray-900"></p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Leverage Type</p>
+                                            <p id="detail-leverage" class="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md inline-block"></p>
+                                        </div>
+                                    </div>
+                                    <div class="space-y-3">
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Primary Objective</p>
+                                            <p id="detail-objective" class="text-xs text-gray-600 leading-relaxed font-medium"></p>
+                                        </div>
+                                        <div>
+                                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wide mb-1">Key Constraint</p>
+                                            <p id="detail-constraint" class="text-xs text-gray-600 leading-relaxed font-medium"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <a id="spotify-link" href="#" target="_blank" onclick="event.stopPropagation()" class="flex items-center justify-center gap-2 w-full py-3 bg-[#1DB954] text-white rounded-xl hover:bg-[#1ed760] transition-all shadow-md text-xs font-bold tracking-wide">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+                                    Listen on Spotify
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <aside class="order-2 md:order-1 col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col gap-3 shrink-0">
+                <div class="relative group">
+                    <input type="text" id="library-search" oninput="handleSearch(this.value)" placeholder="Search wisdom..." class="w-full bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 text-xs outline-none">
+                    <svg class="absolute left-2.5 top-2.5 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="setFilter('all')" id="filter-all" class="flex-1 py-1 text-[10px] font-bold uppercase rounded-md bg-gray-900 text-white shadow-sm transition-all">Library</button>
+                    <button onclick="setFilter('favorites')" id="filter-favorites" class="flex-1 py-1 text-[10px] font-medium uppercase rounded-md text-gray-500 hover:bg-gray-50 transition-all">Saved</button>
+                </div>
+            </div>
+            <div class="flex items-center justify-between px-1 relative">
+                <div class="relative group/filter">
+                    <button onclick="toggleFilterPane()" id="active-context-count" class="text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1.5">
+                        All Topics <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div id="filter-pane" class="absolute top-full left-0 mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-xl z-50 hidden opacity-0 transition-all duration-200 transform scale-95 origin-top-left">
+                        <div class="p-3 border-b border-gray-50 flex justify-between items-center">
+                            <span class="text-[9px] font-bold uppercase tracking-widest text-gray-400">Filter Topics</span>
+                            <button onclick="toggleFilterPane()" class="text-[9px] font-bold text-indigo-500">Close</button>
+                        </div>
+                        <div id="filter-checkbox-list" class="p-2 max-h-64 overflow-y-auto scrollbar-hide"></div>
+                    </div>
+                </div>
+                <button onclick="toggleAddModal()" class="flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-all border border-transparent hover:border-gray-200" title="Add Book">
+                    <span class="text-[10px] font-bold uppercase tracking-wider">Add Book</span>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            <div id="library-list" class="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-hide pb-20"></div>
+        </aside>
+    </main>
+
+    <div id="add-modal" class="fixed inset-0 bg-white/95 backdrop-blur-sm z-50 hidden flex items-center justify-center transition-opacity duration-200 opacity-0">
+        <div class="bg-white w-full max-w-lg p-8 rounded-2xl border border-gray-200 shadow-2xl transform scale-95 transition-transform duration-200">
+            <h3 class="text-lg font-bold text-gray-900 tracking-tight mb-6">Add to Library</h3>
+            <form id="add-form" class="space-y-5">
+                <div class="grid grid-cols-2 gap-4">
+                    <input type="text" id="input-title" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Title" required>
+                    <input type="text" id="input-author" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Author" required>
+                </div>
+                <select id="input-category" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm"><option>Strategy</option><option>Wealth</option><option>Focus</option><option>Creativity</option><option>Mindset</option><option>Psychology</option></select>
+                <textarea id="input-summary" rows="2" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Summary"></textarea>
+                <textarea id="input-quotes" rows="4" class="w-full px-3 py-2 bg-gray-50 border rounded-md text-sm" placeholder="Quotes (Line separated)"></textarea>
+                <div class="pt-2 flex gap-2">
+                    <button type="submit" class="flex-1 py-2.5 text-sm font-semibold text-white bg-gray-900 rounded-lg">Save</button>
+                    <button type="button" onclick="toggleAddModal()" class="flex-1 py-2.5 text-sm font-semibold text-gray-500 bg-gray-100 rounded-lg">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50"></div>
+
+    <script>
+        const starterLibrary=[
+        {id:11,title:"Buy Back Your Time",author:"Dan Martell",category:"Scale",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Core Goal: Owner Over Employee</h2>
+                    <p>The goal is not to work more; it’s to build a business that pays for your time. You don't build a business to be free; you build a business to buy your freedom back.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. The Buyback Loop</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Audit:</span> Track your time for two weeks. Categorize tasks by Energy (Drain vs. Fill) and Value (Low vs. High).</li>
+                        <li><span class="font-bold">Transfer:</span> Hire or automate the tasks that are low-value and energy-draining.</li>
+                        <li><span class="font-bold">Fill:</span> Reinvest that newly bought time into high-value, energy-filling tasks (The "Empire Builder" moves).</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. The DRIP Matrix</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Delegation:</span> Low value, low energy tasks. Get them off your plate immediately.</li>
+                        <li><span class="font-bold">Replacement:</span> High value, low energy tasks. Find someone to do these as well as you do.</li>
+                        <li><span class="font-bold">Investment:</span> Low value, high energy tasks. Hobbies and creative outlets that recharge you.</li>
+                        <li><span class="font-bold">Production:</span> High value, high energy tasks. Your "Zone of Genius." This is where the $10k/mo magic happens.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. The 10-80-10 Rule</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> You should only be involved in the first 10% (Vision/Direction) and the last 10% (Review/QC) of a project.</li>
+                        <li><span class="font-bold">Application:</span> Let your systems or team handle the "Middle 80." This is how you scale without burning out.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"You don't hire to grow your business; you hire to buy back your time.",context:"Shift from 'Cost' thinking to 'Investment' thinking. Your time is the most expensive resource."},
+            {text:"Your business should be a machine that produces freedom, not a cage that requires your presence.",context:"System design: If the architect has to be on-site every day, the blueprint is fragile."},
+            {text:"If you're the smartest person in the room, you're in the wrong room.",context:"Leverage: Surround yourself with experts who can execute your vision better than you can."},
+            {text:"Success is not about how much you do, but how much you get done through others.",context:"The transition from Technician to Entrepreneur requires mastering the art of delegation."},
+            {text:"Every task you do that someone else could do for $20/hour is a task that costs you $1000/hour in opportunity.",context:"Opportunity cost: Ruthlessly audit your hourly rate vs. your task list."}
+        ]},
+        {id:1,title:"$100M Offers",author:"Alex Hormozi",category:"Strategy",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Foundation: Grand Slam Offers</h2>
+                    <p>A Grand Slam Offer is an offer you present to the marketplace that cannot be compared to any other product or service available, making the purchase a "no-brainer" for the prospect.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. The Value Equation</h3>
+                    <p class="font-medium text-gray-900 mb-2">Value = (Dream Outcome × Perceived Likelihood of Achievement) / (Time Delay × Effort & Sacrifice)</p>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Dream Outcome:</span> What the customer wants to achieve (be specific).</li>
+                        <li><span class="font-bold">Perceived Likelihood:</span> How much they trust they will actually get it.</li>
+                        <li><span class="font-bold">Time Delay:</span> How long it takes to see the result. (Lower is better).</li>
+                        <li><span class="font-bold">Effort & Sacrifice:</span> What they have to give up or do. (Lower is better).</li>
+                        <li><span class="font-bold">Blueprint Move:</span> To maximize value, increase the top two (Outcome/Trust) and ruthlessly minimize the bottom two (Wait/Work).</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Finding a "Starving Crowd"</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> A great offer to a bad market will fail. A bad offer to a great market will survive. A great offer to a great market makes you rich.</li>
+                        <li><span class="font-bold">Targeting Criteria:</span> 1. Massive Pain, 2. Purchasing Power, 3. Easy to Target, 4. Growing Market.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Pricing for Profit</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Price should be a function of value, not cost. Commodities compete on price (race to the bottom); unique offers compete on value.</li>
+                        <li><span class="font-bold">Application:</span> Raising your price increases the customer's perceived value and their emotional investment in getting results. It also provides the margin needed to over-deliver on service.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. The Offer Creation Process (Steps)</h3>
+                    <ul class="list-decimal pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Identify Problems:</span> List every single obstacle a customer faces in reaching the dream outcome.</li>
+                        <li><span class="font-bold">Solution List:</span> Turn every problem into a solution. "I don't know what to cook" becomes "Personalized meal plans."</li>
+                        <li><span class="font-bold">Delivery Vehicle:</span> How will you deliver that solution? (1-on-1, Group, Do-it-yourself, Done-for-you).</li>
+                        <li><span class="font-bold">Trim and Stack:</span> Remove low-value, high-cost solutions. Keep high-value, low-cost ones. Bundle them into one "Grand Slam" offer.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. Scarcity and Urgency</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Scarcity:</span> Limitation on quantity (e.g., only 5 spots available).</li>
+                        <li><span class="font-bold">Urgency:</span> Limitation on time (e.g., offer expires Friday).</li>
+                        <li><span class="font-bold">The Rule:</span> Never lie. Use "Honest Scarcity." If you can only handle 10 clients, tell them you only have 10 spots.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Bonuses and Guarantees</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Bonuses:</span> A single offer is a price; a bundle of bonuses is a deal. Bonuses should address specific objections.</li>
+                        <li><span class="font-bold">Guarantees:</span> The goal is to reverse the risk. "If you don't get X, you don't pay Y." A strong guarantee can double or triple conversion.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. Naming the Offer (The M-A-G-I-C Formula)</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">M</span>ake a Magnetic Reason (Why are you doing this?)</li>
+                        <li><span class="font-bold">A</span>nnounce the Avatar (Who is it for?)</li>
+                        <li><span class="font-bold">G</span>ive them a Goal (What is the result?)</li>
+                        <li><span class="font-bold">I</span>ndicate a Time Interval (How long will it take?)</li>
+                        <li><span class="font-bold">C</span>omplete with a Container Word (Challenge, Program, System).</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"Make people an offer so good they would feel stupid saying no.",context:"The 'Grand Slam Offer' solves the conversion problem by making the value-to-price ratio so skewed that refusing feels irrational."}, 
+            {text:"Volume negates luck.",context:"Establish a baseline of reality by doubling your output volume for 30 days. High reps let the math work in your favor."}, 
+            {text:"Attention is the new currency.",context:"Build the mechanism to capture the market's attention before investing in the final product."},
+            {text:"People will pay for what they value, but they will stay for what they love.",context:"Retention blueprints: Focus on experience after the sale to maximize Lifetime Value (LTV)."},
+            {text:"You don't get what you want, you get what you tolerate.",context:"Operations & Standards: Your business scale is capped by the level of chaos you are willing to accept."},
+            {text:"The best marketing is a product that actually works.",context:"QC is the ultimate growth lever. Word-of-mouth out-scales paid ads once the product is elite."},
+            {text:"Simple scales. Complex fails.",context:"System design: Ruthlessly remove steps from your fulfillment process until it is unbreakable."}
+        ]},
+        {id:2,title:"Atomic Habits",author:"James Clear",category:"Focus",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Fundamentals: Why Tiny Changes Make a Big Difference</h2>
+                    <h3 class="font-bold text-gray-900">Chapter 1: The Surprising Power of Atomic Habits</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Habits are the compound interest of self-improvement.</li>
+                        <li><span class="font-bold">Wisdom:</span> A 1% improvement every day makes you 37 times better by the end of the year. Conversely, a 1% decline brings you nearly to zero.</li>
+                        <li><span class="font-bold">Key Concept:</span> "The Plateau of Latent Potential." Results are delayed. You don't see progress for a long time, then you hit a breakthrough. It’s not "wasted" effort; it’s "stored" effort.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">Chapter 2: How Your Habits Shape Your Identity (and Vice Versa)</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Focus on who you want to become, not what you want to achieve.</li>
+                        <li><span class="font-bold">Wisdom:</span> Most people focus on <span class="italic">outcomes</span> (losing weight) or <span class="italic">processes</span> (running). The most effective habits are <span class="italic">identity-based</span>. Every action you take is a "vote" for the type of person you wish to become.</li>
+                        <li><span class="font-bold">Identity Shift:</span> Instead of saying "I'm trying to quit smoking," say "I'm not a smoker."</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">Chapter 3: How to Build Better Habits in 4 Simple Steps</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> The Feedback Loop: Cue → Craving → Response → Reward.</li>
+                        <li><span class="font-bold">Wisdom:</span> If a behavior is missing any of these four, it won't become a habit. To build a good habit: Make it Obvious, Attractive, Easy, and Satisfying. To break a bad one: Invert those rules.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1 pt-4">
+                    <h2 class="font-bold text-gray-900 text-base">The 4 Laws of Behavior Change</h2>
+                    <h3 class="font-bold text-gray-900">The 1st Law: Make It Obvious</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Motivation is overrated; Environment matters more.</li>
+                        <li><span class="font-bold">Wisdom:</span> Design your world for the habits you want. Be the architect of your environment. If you want to drink more water, put bottles everywhere. Visual cues are the strongest triggers.</li>
+                        <li><span class="font-bold">Strategy:</span> "After [CURRENT HABIT], I will [NEW HABIT]."</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">The 2nd Law: Make It Attractive</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Link an action you want to do with one you need to do.</li>
+                        <li><span class="font-bold">Wisdom:</span> Use Temptation Bundling. We imitate the habits of three groups: The Close, The Many, and The Powerful. Join a culture where your desired behavior is the normal behavior.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">The 3rd Law: Make It Easy</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> A habit must be established before it can be improved.</li>
+                        <li><span class="font-bold">Wisdom:</span> Focus on repetition, not perfection. Scale your habits down until they take two minutes or less.</li>
+                        <li><span class="font-bold">The Two-Minute Rule:</span> "Read one page" is better than "Read a book."</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">The 4th Law: Make It Satisfying</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> What is immediately rewarded is repeated.</li>
+                        <li><span class="font-bold">Wisdom:</span> Human brains prioritize immediate rewards. Use a habit tracker—visual proof of progress is a reward.</li>
+                        <li><span class="font-bold">The Cardinal Rule:</span> Never miss twice. If you miss one day, get back on the horse immediately.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1 pt-4">
+                    <h2 class="font-bold text-gray-900 text-base">Advanced Tactics</h2>
+                    <h3 class="font-bold text-gray-900">The Truth About Talent</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Choose the right field of competition.</li>
+                        <li><span class="font-bold">Wisdom:</span> Play a game where the odds are in your favor. Success is about finding where your strengths meet your routines.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">The Goldilocks Rule</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Nugget:</span> Stay on the edge of your ability to stay engaged.</li>
+                        <li><span class="font-bold">Wisdom:</span> Motivation peaks at "just right" difficulty. Professionalism is showing up on a schedule when you don't feel like it.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"You do not rise to the level of your goals. You fall to the level of your systems.",context:"Goals are about results; systems are about processes. Engineering your environment beat willpower every time."}, 
+            {text:"Habits are the compound interest of self-improvement.",context:"1% daily improvements result in being 37x better in a year. Compounding is a slow process that produces massive late-stage results."},
+            {text:"Every action you take is a vote for the type of person you wish to become.",context:"Identity engineering: Small habits provide the evidence for your new self-image."},
+            {text:"Environment is the invisible hand that shapes human behavior.",context:"Visual cues are the strongest triggers. Be the architect of your surroundings."},
+            {text:"Success is the product of daily habits—not once-in-a-lifetime transformations.",context:"Stop looking for breakthroughs; start looking for tiny wins."},
+            {text:"The most effective way to change your habits is to focus not on what you want to achieve, but on who you wish to become.",context:"Identity-based habits bypass the friction of outcome-chasing."},
+            {text:"Be the designer of your world and not just the consumer of it.",context:"Autonomy: Actively construct the systems that guide your daily flow."}
+        ]},
+        {id:3,title:"Psychology of Money",author:"Morgan Housel",category:"Wealth",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Core Premise: Behavior > Math</h2>
+                    <p>Success with money is not about how smart you are; it's about how you behave. Doing well with money has little to do with how smart you are and a lot to do with how you behave. And behavior is hard to teach, even to really smart people.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. No One's Crazy</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Your personal experiences with money make up maybe 0.00000001% of what’s happened in the world, but 80% of how you think the world works.</li>
+                        <li><span class="font-bold">Application:</span> Recognize that your risk tolerance is anchored to the era you grew up in. Audit your financial biases—are they based on data or on the trauma/success of your formative years?</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Luck & Risk</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Luck and Risk are siblings. They are both the reality that every outcome in life is guided by forces other than individual effort.</li>
+                        <li><span class="font-bold">Application:</span> Be careful who you praise and admire. Be careful who you look down upon and wish to avoid becoming. Focus less on specific individuals and more on broad patterns.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Never Enough</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> The hardest financial skill is getting the goalpost to stop moving.</li>
+                        <li><span class="font-bold">Application:</span> There is no reason to risk what you have and need for what you don’t have and don’t need. Happiness is just results minus expectations.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Confounding Compounding</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Warren Buffett’s fortune isn’t just due to being a good investor, but being a good investor for <span class="italic">three-quarters of a century</span>.</li>
+                        <li><span class="font-bold">Application:</span> Time is the most powerful force in investing. It makes little things grow big and big mistakes fade away. It isn’t necessarily about making the highest returns; it’s about making pretty good returns that you can stick with for the longest period of time.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. Getting Rich vs. Staying Rich</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Getting rich requires taking risks, being optimistic, and putting yourself out there. Staying rich requires the opposite: humility, and fear that what you’ve made can be taken away from you just as fast.</li>
+                        <li><span class="font-bold">Application:</span> Survival is the only strategy that matters. A "margin of safety" (cash reserves, low leverage) is what allows compounding to work its magic because it prevents you from being forced to sell during a downturn.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Tails, You Win</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Anything that is huge, profitable, famous, or influential is the result of a tail event—an outlying one-in-a-thousands event.</li>
+                        <li><span class="font-bold">Application:</span> You can be wrong half the time and still make a fortune. It's not about your batting average; it's about what you do when you hit a home run.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. Freedom</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> The highest form of wealth is the ability to wake up every morning and say, “I can do whatever I want today.”</li>
+                        <li><span class="font-bold">Application:</span> Money’s greatest intrinsic value—and this can’t be overstated—is its ability to give you control over your time. Using your money to buy time and options has a lifestyle benefit few luxury goods can match.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">8. Wealth is What You Don't See</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Spending money to show people how much money you have is the fastest way to have less money.</li>
+                        <li><span class="font-bold">Application:</span> Rich is a current income level. Wealth is income not spent. Wealth is the cars not purchased, the diamonds not bought. Wealth is financial assets that haven’t yet been converted into the stuff you see.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">9. Save Money</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> You don’t need a specific reason to save.</li>
+                        <li><span class="font-bold">Application:</span> Savings that aren't earmarked for anything specific are a hedge against life's inevitable ability to surprise the hell out of you at the worst possible moment.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">10. Reasonable > Rational</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Aiming to be coolly rational is a mistake. You should aim to be "pretty reasonable."</li>
+                        <li><span class="font-bold">Application:</span> A strategy you can stick with during the tough times is superior to a "perfect" strategy you abandon when things get scary. Your investment plan should account for your emotions, not just your spreadsheet.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"Wealth is what you don't see.",context:"Wealth is an option not yet exercised to buy something later. Shift your focus to high-rate assets for absolute autonomy."}, 
+            {text:"Save money. Just save it.",context:"Saving is a hedge against life's ability to surprise you. A margin of safety buys you the time required to stay in the game."},
+            {text:"Independence means you only do the work you like with people you like at the times you want.",context:"The North Star goal: Using capital to buy the right to control your calendar."},
+            {text:"Everything has a price, but not all prices appear on labels.",context:"Opportunity cost: The price of investing is often uncertainty, fear, and regret. You must be willing to pay that price."},
+            {text:"Doing well with money has little to do with how smart you are and a lot to do with how you behave.",context:"Financial systems: Success is 80% behavior and 20% knowledge. Automate the behavior to bypass the ego."},
+            {text:"Planning is important, but the most important part of every plan is to plan on the plan not going according to plan.",context:"Antifragility: Build systems that gain from volatility rather than breaking under it."},
+            {text:"The world is full of obvious things which nobody by any chance ever observes.",context:"Market observation: The best opportunities are often hiding in plain sight behind common biases."}
+        ]},
+        {id:4,title:"Deep Work",author:"Cal Newport",category:"Focus",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Definition: Deep Work vs. Shallow Work</h2>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Deep Work:</span> Professional activities performed in a state of distraction-free concentration that push your cognitive capabilities to their limit. These efforts create new value, improve your skill, and are hard to replicate.</li>
+                        <li><span class="font-bold">Shallow Work:</span> Non-cognitively demanding, logistical-style tasks, often performed while distracted. These efforts tend to not create much new value in the world and are easy to replicate.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. The Deep Work Hypothesis</h3>
+                    <p>The ability to perform deep work is becoming increasingly rare at exactly the same time it is becoming increasingly valuable in our economy. As a consequence, the few who cultivate this skill, and then make it the core of their working life, will thrive.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Why Deep Work is Rare (The Metric Black Hole)</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Principle of Least Resistance:</span> In the absence of clear feedback, we gravitate toward behaviors that are easiest in the moment (e.g., checking email constantly).</li>
+                        <li><span class="font-bold">Busyness as a Proxy for Productivity:</span> In the absence of clear indicators of what it means to be productive, many knowledge workers turn back toward an industrial indicator of productivity: doing lots of stuff in a visible manner.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. The Rules of Deep Work</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Rule #1: Work Deeply.</span> You must build rituals and routines to minimize the use of your limited willpower. 
+                            <span class="italic">Strategies:</span> Monastic (total isolation), Bimodal (splitting time between deep and shallow), Rhythmic (daily habit), or Journalist (fitting it in whenever possible).
+                        </li>
+                        <li><span class="font-bold">Rule #2: Embrace Boredom.</span> To succeed with deep work, you must rewire your brain to be comfortable without constant stimulus. Stop "glancing" at your phone every time you're bored.</li>
+                        <li><span class="font-bold">Rule #3: Quit Social Media.</span> Treat your tools like a craftsman. Only use a tool if its positive impact on your goals outweighs the negative. Most social media is "any-benefit" thinking, which is a trap.</li>
+                        <li><span class="font-bold">Rule #4: Drain the Shallows.</span> Ruthlessly limit shallow work. Set a "shallow work budget" and schedule every minute of your day to ensure the deep tasks get the priority.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Attention Residue</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> When you switch from Task A to Task B, your attention doesn't immediately follow—a residue of your attention remains stuck thinking about the original task.</li>
+                        <li><span class="font-bold">Application:</span> "Quickly checking" email during a deep work session is catastrophic. It destroys your cognitive intensity for 15-20 minutes afterward. Deep work requires <span class="italic">long</span>, unbroken stretches of focus.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. The 4 Disciplines of Execution (4DX) for Deep Work</h3>
+                    <ol class="list-decimal pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Focus on the Wildly Important:</span> Have a small number of ambitious goals.</li>
+                        <li><span class="font-bold">Act on the Lead Measures:</span> Track the time spent in a state of deep work (the lead measure), not just the finished results (the lag measure).</li>
+                        <li><span class="font-bold">Keep a Compelling Scoreboard:</span> Physically track your deep work hours.</li>
+                        <li><span class="font-bold">Create a Cadence of Accountability:</span> Review your progress regularly.</li>
+                    </ol>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Shutdown Ritual</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> At the end of the workday, complete a formal ritual to signal to your brain that work is over.</li>
+                        <li><span class="font-bold">Application:</span> Review your tasks, plan for tomorrow, and say a "shutdown complete" phrase. This prevents work stress from leaking into your rest time, allowing for true recovery.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"Deep work is the superpower of the 21st century.",context:"Cognitive intensity pushed to the limit creates rare, hard-to-replicate value. Block 4 hours of monastic time daily."}, 
+            {text:"Drain the shallows.",context:"Shallow work is non-cognitively demanding and easy to replicate. Scale back logistical tasks to protect the core output."},
+            {text:"If you don't produce, you won't thrive—no matter how skilled or talented you are.",context:"Output priority: The market only rewards what is actually shipped, not what is envisioned."},
+            {text:"Clarity about what matters provides clarity about what does not.",context:"Focus is a recursive process of subtraction. Know your North Star to ignore the noise."},
+            {text:"To build your working life around the experience of flow is a path to deep satisfaction.",context:"Human fulfillment: The state of deep concentration is intrinsically rewarding beyond the financial results."},
+            {text:"The common habit of working in a state of semi-distraction is potentially devastating to performance.",context:"Cognitive intensity: Multi-tasking is a myth that destroys the quality of the final architectural blueprint."},
+            {text:"Schedule every minute of your day... not to be a slave to the clock, but to ensure deep work happens.",context:"Time management: Structural constraints are what allow for creative freedom within the blocks."}
+        ]},
+        {id:5,title:"The Creative Act",author:"Rick Rubin",category:"Creativity",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Philosophy: Creativity as a Way of Being</h2>
+                    <p>Creativity is not just for "artists." It is a fundamental human way of interacting with the world. To live as an artist is to be in a state of constant, radical receptivity to the signals the universe is sending you.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. Everyone is an Artist</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Being an artist means being aware. It's about how you perceive the world and how you respond to what you see. Every choice you make—how you dress, how you speak, how you solve a business problem—is a creative act.</li>
+                        <li><span class="font-bold">Application:</span> Stop separating "work" from "art." Bring the same level of care and presence to your business systems as an architect brings to a skyscraper.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Radical Receptivity</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> The artist’s job is to be an antenna. You don't "create" ideas; you catch them. They are already out there in the universe, waiting for someone to be quiet enough to hear them.</li>
+                        <li><span class="font-bold">Application:</span> Cultivate moments of stillness. Pay attention to the subtle signals—the way a tree looks in the morning, a scrap of conversation, a sudden feeling. These are the raw materials of your next breakthrough.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. The Audience Comes Last</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> If you create for an audience, you are not making art; you are making a product. The best work comes from a place of personal truth, not market research.</li>
+                        <li><span class="font-bold">Application:</span> Make the thing that <span class="italic">you</span> want to see in the world. If you love it deeply, others will too. Vulnerability and honesty are what resonate, not perfection.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Subtraction (The "Edit")</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Art is often about what you take away. The goal is to find the essence of the work and remove everything that distracts from it.</li>
+                        <li><span class="font-bold">Application:</span> Ruthlessly audit your business and your creative projects. What is the one thing this project is trying to say? Delete everything else. Clarity comes from subtraction.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. Practice vs. Performance</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Focus on the ritual, not the result. The work is the reward. If you focus on the outcome, you become fragile; if you focus on the practice, you become antifragile.</li>
+                        <li><span class="font-bold">Application:</span> Show up at the desk/studio every day as a form of service. The Muse doesn't respond to the person waiting for a big break; she responds to the person who is already working.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Look for the "Small" Truth</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Don't try to make a "masterpiece." Just try to make one true thing. A small truth is more powerful than a grand lie.</li>
+                        <li><span class="font-bold">Application:</span> If you're stuck, go smaller. Solve one tiny part of the problem with absolute honesty. The masterpiece is just a collection of small truths.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. The Source</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> We are all connected to a deeper source of wisdom. The ego is the barrier between us and that source.</li>
+                        <li><span class="font-bold">Application:</span> Quiet the ego's desire for credit, fame, or money. When you work from the source, the work has a timeless, architectural quality that transcends trends.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[{text:"The universe is not static.",context:"Creativity is a fundamental way of being. It requires radical receptivity to signals around you. Reflect personal truth over market trends for a more elegant, resilient business solution."}, {text:"We are all creators.",context:"Art is a form of service. Revenue is a trailing metric of how well you performed the creative act. approach your business systems with the same care an artist gives to their masterpiece."}]},
+        {id:6,title:"Antifragile",author:"Nassim Taleb",category:"Strategy",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Triad: Fragile, Robust, Antifragile</h2>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Fragile:</span> What hates disorder and volatility (it breaks).</li>
+                        <li><span class="font-bold">Robust:</span> What is indifferent to disorder and volatility (it stays the same).</li>
+                        <li><span class="font-bold">Antifragile:</span> What <span class="italic">loves</span> and grows from disorder, volatility, and stressors.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. Hormesis and Overcompensation</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> A small amount of stress makes a system stronger by triggering overcompensation. (e.g., lifting weights makes bones and muscles stronger than they were before).</li>
+                        <li><span class="font-bold">Application:</span> Systems that are too "smooth" or "protected" become fragile. Depriving a system of stressors eventually kills it. You need volatility to stay alive and grow.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. The Barbell Strategy</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Avoid the middle. Be hyper-conservative in 90% of your life/business and hyper-aggressive (with limited downside) in 10%.</li>
+                        <li><span class="font-bold">Application:</span> Instead of "medium risk" (which is often high risk in disguise), play it very safe to ensure survival, then take massive swings where the cost of failure is small but the upside is huge.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Optionality</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> An option is the right but not the obligation to do something. Optionality is what allows you to benefit from the positive side of uncertainty without being harmed by the negative.</li>
+                        <li><span class="font-bold">Application:</span> In an unpredictable world, don't try to predict. Instead, position yourself to have many options. Asymmetry is your friend: Look for situations where you have little to lose and much to gain.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Via Negativa (Subtraction over Addition)</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> We often think progress comes from adding things, but true robustness often comes from taking things away.</li>
+                        <li><span class="font-bold">Application:</span> To improve health, stop eating processed junk. To improve your business, stop doing low-leverage tasks. Solutions are often found by removing the fragile parts of the system.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. The Lindy Effect</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> For non-perishable things (ideas, books, technology), every additional day of life implies a longer remaining life expectancy.</li>
+                        <li><span class="font-bold">Application:</span> If a book has been in print for 50 years, it will likely be in print for another 50. If an idea is brand new, it will likely be gone tomorrow. Trust what has survived the test of time.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Skin in the Game</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> You cannot have an antifragile system if the decision-makers don't suffer the consequences of their mistakes.</li>
+                        <li><span class="font-bold">Application:</span> Never trust anyone who doesn't have skin in the game. In your own business, ensure you are directly exposed to the results of your decisions—this is the only way to truly learn and build an antifragile structure.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. The Green Lumber Fallacy</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Mistaking the source of important knowledge for something else that is more visible but less relevant. (The lumber trader who didn't know "green lumber" wasn't literally green, yet was the most successful trader because he understood price dynamics).</li>
+                        <li><span class="font-bold">Application:</span> Don't get distracted by academic "expert" knowledge. Focus on what actually works in practice, even if you can't explain why.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[{text:"Wind extinguishes a candle and energizes fire.",context:"Antifragile systems grow from stressors. build a business structure that gains strength from market volatility. The goal isn't just to survive chaos, but to profit from it."}, {text:"Avoid the middle.",context:"The Barbell Strategy: Play it very safe in 90% of your life and business, then take aggressive, high-upside swings with 10%."}]},
+        {id:7,title:"Essentialism",author:"Greg McKeown",category:"Focus",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Core Philosophy: Less but Better</h2>
+                    <p>Essentialism is not about how to get more things done; it’s about how to get the <span class="italic">right</span> things done. It is a disciplined, systematic approach for determining where our highest point of contribution lies, then making execution of those things almost effortless.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. The Essence of Essentialism</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Individual Choice:</span> We can choose how to spend our energy and time. Without choice, we are at the mercy of others' agendas.</li>
+                        <li><span class="font-bold">The Prevalence of Noise:</span> Almost everything is noise. Very few things are exceptionally valuable.</li>
+                        <li><span class="font-bold">Trade-offs:</span> We can’t have it all or do it all. We must make deliberate trade-offs. The question is not "How can I do both?" but "Which problem do I want to solve?"</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Explore: Discern the Vital Few from the Trivial Many</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Escape:</span> Create space to think and explore. If you're too busy to think, you're too busy to be successful.</li>
+                        <li><span class="font-bold">Look:</span> See what really matters. Scan for the lead, not just the facts.</li>
+                        <li><span class="font-bold">Play:</span> Embrace the wisdom of your inner child. Play sparks creativity and leads to breakthroughs.</li>
+                        <li><span class="font-bold">Sleep:</span> Protect your greatest asset (your mind/body). One hour of sleep creates several hours of high-productivity.</li>
+                        <li><span class="font-bold">Select:</span> Use extreme criteria. If it isn't a "Hell Yes," it's a "No." Use the 90% Rule: if you don't rate an opportunity at least a 90 out of 100, reject it.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Eliminate: Cut Out the Trivial Many</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Clarify:</span> One "Essential Intent" is better than a dozen vague goals. A clear intent is both inspirational and concrete.</li>
+                        <li><span class="font-bold">Dare:</span> The power of a graceful "No." Saying no is the key to saying yes to what matters. People respect those who are clear about their boundaries.</li>
+                        <li><span class="font-bold">Uncommit:</span> Win big by cutting your losses. Avoid the "Sunk Cost Fallacy." Ask: "If I weren't already invested in this, how much would I invest to get into it now?"</li>
+                        <li><span class="font-bold">Edit:</span> The invisible art. An editor doesn't just add; they subtract to make the story clearer and more impactful.</li>
+                        <li><span class="font-bold">Limit:</span> Set boundaries. Boundaries actually create freedom by keeping the non-essential from leaking into your vital space.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Execute: Remove Friction to Make Execution Effortless</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Buffer:</span> Expect the unexpected. Give yourself 50% more time than you think you need for any task. A buffer is a hedge against the friction of reality.</li>
+                        <li><span class="font-bold">Subtract:</span> Bring forth more by removing obstacles. Identify the "slowest hiker" in your process—the bottleneck—and remove it.</li>
+                        <li><span class="font-bold">Progress:</span> The power of small wins. Don't aim for a giant leap; aim for a small, consistent gain. Early and often wins the race.</li>
+                        <li><span class="font-bold">Flow:</span> Design a routine that makes the essential the default. When the essential becomes a habit, it requires no willpower to execute.</li>
+                        <li><span class="font-bold">Focus:</span> Be here now. What is important <span class="italic">right now</span>? Tune out the past and future to perform at your peak in the present.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[{text:"If it isn't a clear yes, then it's a clear no.",context:"The disciplined pursuit of less. Clear out 'good' opportunities to make room for the truly 'great' ones. If a task doesn't contribute to your North Star goals, strike it off immediately."}, {text:"Less but better.",context:"Contribution requires subtraction. Identify the one thing that makes everything else easier or unnecessary, and devote 80% of your energy to that single move."}]},
+        {id:8,title:"Influence",author:"Robert Cialdini",category:"Psychology",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Weapons of Influence</h2>
+                    <p>In a world of information overload, humans rely on mental shortcuts (fixed-action patterns) to make decisions. "Compliance professionals" use these triggers to bypass our rational thinking and get an automatic "yes."</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. Reciprocation</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> We feel an overwhelming obligation to repay what another person has provided us.</li>
+                        <li><span class="font-bold">The Trigger:</span> Even an uninvited or unwanted favor creates a debt.</li>
+                        <li><span class="font-bold">The Technique:</span> "Rejection-then-Retreat." Ask for a large favor (knowing they'll say no), then "concede" to a smaller favor. They will feel a need to reciprocate your concession by saying yes to the second request.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Commitment and Consistency</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> Once we make a choice or take a stand, we face personal and interpersonal pressures to behave consistently with that commitment.</li>
+                        <li><span class="font-bold">The Trigger:</span> Small, initial commitments. Once a person takes a tiny step, they will change their self-image to be consistent with that step.</li>
+                        <li><span class="font-bold">The Technique:</span> "Foot-in-the-Door." Get them to agree to a small request, making it much easier to get them to agree to a larger, related one later. Public, effortful, and voluntary commitments are the strongest.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Social Proof</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> We view a behavior as more correct in a given situation to the degree that we see others performing it.</li>
+                        <li><span class="font-bold">The Trigger:</span> Uncertainty and Similarity. We look to others when we are unsure, and we are most influenced by people we perceive as being like ourselves.</li>
+                        <li><span class="font-bold">Application:</span> Testimonials, "Bestseller" lists, and showing that "people like you" are using the service are incredibly powerful conversion drivers.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Liking</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> We prefer to say yes to the requests of someone we know and like.</li>
+                        <li><span class="font-bold">The Factors:</span> 
+                            1. Physical Attractiveness (Halo effect), 
+                            2. Similarity (Opinions, background, personality), 
+                            3. Compliments (We love flattery even when we know it's fake), 
+                            4. Contact and Cooperation (Familiarity through positive interaction).
+                        </li>
+                        <li><span class="font-bold">Application:</span> Build rapport and find common ground before asking for anything. "Mirroring" behavior is a subtle but effective way to trigger liking.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. Authority</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> We have a deep-seated sense of duty to authority. We are trained from birth that obedience to proper authority is right.</li>
+                        <li><span class="font-bold">The Symbols:</span> Titles (Dr., CEO), Clothing (Suits, Uniforms), and Trappings (Expensive cars, jewelry) can trigger the authority response even without actual substance.</li>
+                        <li><span class="font-bold">Application:</span> Establish expertise early. Mentioning credentials or having an expert introduce you can bypass skepticism.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. Scarcity</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> Opportunities seem more valuable to us when their availability is limited.</li>
+                        <li><span class="font-bold">The Psychology:</span> "Psychological Reactance." As things become less accessible, we lose freedoms, and we hate losing freedoms. This creates a physical "arousal" that overrides rational thought.</li>
+                        <li><span class="font-bold">The Technique:</span> "Limited Numbers" and "Time Limits." Scarcity is most powerful when it is <span class="italic">newly</span> scarce (we hate losing what we just had) and when we are in <span class="italic">competition</span> for it.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. Unity (The 7th Principle)</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Rule:</span> We are more influenced by people we consider part of "us." It's not just about similarity; it's about shared identity (Family, Tribe, Co-creators).</li>
+                        <li><span class="font-bold">The Trigger:</span> Shared heritage, place, or the act of building something together.</li>
+                        <li><span class="font-bold">Application:</span> Ask for "advice" instead of "feedback." When people give advice, they feel they are co-creating the solution with you, creating a sense of unity.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[{text:"Social proof is powerful.",context:"Humans look to others for correct behavior. Testimonials are the core logic of the sale, not an extra. Build systems that naturally surfaced the success stories of your existing clients."}, {text:"Reciprocity is a key driver.",context:"Lead with genuine value. Trigger the psychological need for repayment by solving problems for free first. Conversion happens naturally when the value-to-ask ratio is high."}]},
+        {id:9,title:"The War of Art",author:"Steven Pressfield",category:"Mindset",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Enemy: Resistance</h2>
+                    <p>Resistance is a universal, invisible force that acts against any act of self-improvement, creativity, or spiritual growth. It is the most dangerous force on the planet because it prevents us from becoming who we are meant to be.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">1. Defining the Enemy</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Resistance is Invisible:</span> You can't see it, but you can feel it as procrastination, self-doubt, fear, or distraction.</li>
+                        <li><span class="font-bold">Resistance is Internal:</span> It's not the economy, your boss, or your spouse. It's you. It's a "self-generated" force designed to keep things exactly as they are.</li>
+                        <li><span class="font-bold">Resistance is Malignant:</span> It will lie, cheat, and assume any form to achieve its goal: stopping you. It's most powerful right before the finish line.</li>
+                        <li><span class="font-bold">Resistance is a Compass:</span> It only targets what's important. The more Resistance you feel toward a project, the more important that project is to your soul.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. Resistance and Symptoms</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Procrastination:</span> The most common manifestation. We don't say "I'm never going to do this"; we say "I'm going to do this tomorrow."</li>
+                        <li><span class="font-bold">Self-Doubt:</span> Resistance uses self-doubt to keep us small. But remember: Truly talented people are often the most full of doubt. The counterfeit is the one who is full of confidence.</li>
+                        <li><span class="font-bold">Fear:</span> Fear is an indicator. If you weren't afraid, you wouldn't be doing anything new. Use fear as a signal that you're on the right track.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. Turning Pro</h3>
+                    <p>The difference between an amateur and a professional is not money. It's an internal shift in attitude.</p>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Amateur:</span> Plays for fun. Over-identifies with the work. Is paralyzed by fear of failure. Waits for "inspiration" to strike.</li>
+                        <li><span class="font-bold">The Professional:</span> Plays for keeps. Shows up every day, no matter what. Dedicates themselves to the craft, not the outcome. Is a "cold-blooded practitioner."</li>
+                        <li><span class="font-bold">Key Moves:</span> 1. Show up every day. 2. Stay on the job all day. 3. Be committed for the long haul. 4. Accept no excuses.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. The Professional and the Ego</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Detach from Results:</span> The professional does the work and lets the chips fall where they may. They don't take success to their head or failure to their heart.</li>
+                        <li><span class="font-bold">Master the Craft:</span> The professional is a student of the game. They focus on the process, the technique, and the "workmanship."</li>
+                        <li><span class="font-bold">Be Humble:</span> The professional knows that the work comes <span class="italic">through</span> them, not <span class="italic">from</span> them. They are a servant to the Muse.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. Invoking the Muse</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Magic of Commitment:</span> When we commit to a task and show up every day, a higher force (the Muse) steps in to help.</li>
+                        <li><span class="font-bold">The Unseen Forces:</span> Angels, Muses, or simply the subconscious—whatever you call it, it only responds to the professional who is already at the desk working.</li>
+                        <li><span class="font-bold">Application:</span> Don't wait for the Muse. Sit down and start working. The Muse will find you there.</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[{text:"The amateur plays for fun. The professional plays for keeps.",context:"Success is showing up on a professional schedule when you don't feel like it. Treat your personal business ventures with the same rigor you'd treat a high-paying client project."}, {text:"Start before you are ready.",context:"Resistance uses perfectionism as a weapon to keep you stagnant. Launch the 'Minimum Viable version' today. Market feedback is the only data that matters."}]},
+        {id:10,title:"Zero to One",author:"Peter Thiel",category:"Strategy",synopsis:`
+            <div class="flex flex-col gap-8 text-[13px] leading-relaxed text-gray-700 max-w-3xl mx-auto py-4">
+                <div class="space-y-1">
+                    <h2 class="font-bold text-gray-900 text-base">The Challenge: 0 to 1 vs. 1 to n</h2>
+                    <p>Vertical progress (0 to 1) means doing something nobody has ever done. Horizontal progress (1 to n) means copying things that work—globalization. The future depends on new technology, not just better versions of old things.</p>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-bold text-gray-900">1. The Contrarian Question</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Question:</span> "What important truth do very few people agree with you on?"</li>
+                        <li><span class="font-bold">The Insight:</span> Most people think the future will be defined by globalization, but Thiel argues it will be defined by technology. To build a great company, you must find a secret—something true but unknown.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">2. All Happy Companies Are Different</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Competition is for losers. If you want to create and capture lasting value, don't build an undifferentiated commodity business.</li>
+                        <li><span class="font-bold">Monopoly vs. Perfect Competition:</span> Under perfect competition, all profits are competed away. Monopolies (like Google) own their market and can set their own prices. Happy companies are different because they found a unique solution; all unhappy companies are alike because they failed to escape competition.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">3. The Ideology of Competition</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> We preach competition but it's actually destructive. It makes us focus on the people around us instead of what's important or valuable.</li>
+                        <li><span class="font-bold">Application:</span> If you can't beat a rival, it's better to merge. But better yet, build something so unique that you have no rivals.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">4. Last Mover Advantage</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> It's not enough to be the first mover. You want to be the <span class="italic">last</span> mover—the one who makes the final great development in a specific market.</li>
+                        <li><span class="font-bold">Characteristics of a Monopoly:</span> 
+                            1. Proprietary Technology (10x better than nearest substitute), 
+                            2. Network Effects, 
+                            3. Economies of Scale, 
+                            4. Branding.
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">5. You Are Not a Lottery Ticket</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> Success is not a matter of luck. Indefinite attitudes toward the future explain why people stop planning and start speculating.</li>
+                        <li><span class="font-bold">Application:</span> A business with a "definite" plan will always be underrated in a world where people think success is just a roll of the dice. You can have agency over your future.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">6. The Power Law</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">The Concept:</span> In venture capital and life, a small handful of things produce the majority of the returns.</li>
+                        <li><span class="font-bold">Application:</span> Focus your energy on the one thing that has the potential to be 10x or 100x bigger than everything else. Don't diversify for the sake of it; concentration leads to mastery and massive payoffs.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">7. Foundations and Sales</h3>
+                    <ul class="list-disc pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Thiel's Law:</span> A startup messed up at its foundation cannot be fixed. Choosing partners and early employees is the most critical task.</li>
+                        <li><span class="font-bold">Sales:</span> Sales is invisible. If you've built something but haven't figured out a way to sell it, you have a bad business—no matter how good the product is. Distribution is as important as the product itself.</li>
+                    </ul>
+                </div>
+
+                <div class="space-y-1">
+                    <h3 class="font-bold text-gray-900">8. The Seven Questions Every Business Must Answer</h3>
+                    <ol class="list-decimal pl-5 space-y-1 mt-2">
+                        <li><span class="font-bold">Engineering:</span> Can you create breakthrough technology instead of incremental improvements?</li>
+                        <li><span class="font-bold">Timing:</span> Is now the right time to start this business?</li>
+                        <li><span class="font-bold">Monopoly:</span> Are you starting with a big share of a small market?</li>
+                        <li><span class="font-bold">People:</span> Do you have the right team?</li>
+                    </ul>
+                </div>
+            </div>
+        `,quotes:[
+            {text:"Competition is for losers.",context:"Escape the red ocean. Build a vertical advantage around a secret truth that no one else agrees with."}, 
+            {text:"Sales matters just as much as product.",context:"Distribution logic: A perfect product that no one knows about is a failure. Spend 50% of your energy on the mechanism of delivery."},
+            {text:"The best entrepreneurs know this: every great business is built around a secret that's hidden from the outside.",context:"Secret hunting: What are the inefficiencies in local biz AI that the market is ignoring?"},
+            {text:"If you can identify a small market that you can dominate, you have a solid foundation for growth.",context:"Market selection: Start small and vertical. Dominate the niche before expanding to the next tier."},
+            {text:"A startup is the largest endeavor over which you can have definite mastery.",context:"Individual agency: You are not a lottery ticket. Your systems determine your results."},
+            {text:"The most valuable businesses of coming decades will be built by entrepreneurs who seek to empower people rather than make them obsolete.",context:"Human-centric AI: Position your consulting as a tool for leverage, not a replacement for the architect."},
+            {text:"Every moment in business happens only once.",context:"Timing and uniqueness: The opportunity to rebuild agency systems is a present-tense tail event."}
+        ]}
+        ];
+
+        const metaData = {
+            1: { leverage: "Systems", obj: "De-coupling time from revenue.", con: "Commodity pricing models.", spotify: "https://open.spotify.com/episode/3G7B7Hh8N0L0wV6N1zYmXJ" },
+            2: { leverage: "Identity", obj: "Exponential compounding of micro-habits.", con: "Relying on willpower.", spotify: "https://open.spotify.com/episode/1N38I3I6U8F6y7U8zV3X9Z" },
+            3: { leverage: "Behavioral", obj: "Building autonomy through assets.", con: "Social signaling desire.", spotify: "https://open.spotify.com/episode/3k7v7I6U8F6y7U8zV3X9Z" },
+            4: { leverage: "Cognitive", obj: "Creating high-value rare output.", con: "Digital distraction trap.", spotify: "https://open.spotify.com/episode/4m7v7I6U8F6y7U8zV3X9Z" },
+            5: { leverage: "Creative", obj: "Work as a form of service.", con: "Focusing on audience expectations.", spotify: "https://open.spotify.com/episode/5n7v7I6U8F6y7U8zV3X9Z" },
+            6: { leverage: "Systems", obj: "Structures that gain from volatility.", con: "Fragile corporate models.", spotify: "https://open.spotify.com/episode/6p7v7I6U8F6y7U8zV3X9Z" },
+            7: { leverage: "Strategic", obj: "Maximizing contribution via focus.", con: "Disciplined pursuit of less.", spotify: "https://open.spotify.com/episode/7q7v7I6U8F6y7U8zV3X9Z" },
+            8: { leverage: "Psychology", obj: "Influence via cognitive triggers.", con: "Lack of reciprocity in funnels.", spotify: "https://open.spotify.com/episode/8r7v7I6U8F6y7U8zV3X9Z" },
+            9: { leverage: "Creative", obj: "Defeating internal Resistance.", con: "Treating projects as a hobby.", spotify: "https://open.spotify.com/episode/9s7v7I6U8F6y7U8zV3X9Z" },
+            10: { leverage: "Capital", obj: "Vertical progress via secrets.", con: "Horizontal red-ocean competition.", spotify: "https://open.spotify.com/episode/0t7v7I6U8F6y7U8zV3X9Z" },
+            11: { leverage: "Time", obj: "Buying freedom through delegation.", con: "Technician's ego / Sunk cost.", spotify: "https://open.spotify.com/search/Buy%20Back%20Your%20Time%20Dan%20Martell" }
+        };
+
+        let favorites = JSON.parse(localStorage.getItem('mojo_fav_v60')) || [];
+        let quoteQueue = [];
+        let currentQuoteIndex = 0;
+        let activeCategories = [];
+        let isPaused = false;
+        let isTrayOpen = false;
+        let isTransitioning = false;
+        let rotatorInterval;
+        let timeLeft = 100;
+        const DURATION = 10000;
+
+        function saveState() { localStorage.setItem('mojo_fav_v60', JSON.stringify(favorites)); }
+
+        function init() {
+            buildQuoteQueue();
+            renderLibrary('all');
+            if(quoteQueue.length > 0) updateQuoteDOM(quoteQueue[0]);
+            startRotator();
+        }
+
+        function buildQuoteQueue() {
+            quoteQueue = [];
+            starterLibrary.forEach(book => {
+                if(activeCategories.length === 0 || activeCategories.includes(book.category)) {
+                    book.quotes.forEach(qObj => {
+                        const isFav = favorites.includes(qObj.text);
+                        const item = { text: qObj.text, context: qObj.context, author: book.author, title: book.title, category: book.category, bookId: book.id, fav: isFav };
+                        if(isFav) { quoteQueue.push(item); quoteQueue.push(item); }
+                        quoteQueue.push(item);
+                    });
+                }
+            });
+            quoteQueue.sort(() => Math.random() - 0.5);
+            updateFilterLabel();
+        }
+
+        function updateFilterLabel() {
+            const countEl = document.getElementById('active-context-count');
+            if (activeCategories.length === 0) {
+                countEl.innerHTML = `All Topics <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+                countEl.className = "text-[10px] font-bold uppercase tracking-widest text-gray-400 hover:text-indigo-600 transition-colors flex items-center gap-1.5";
+            } else {
+                countEl.innerHTML = `${activeCategories.length} Topics Active <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><polyline points="6 9 12 15 18 9"></polyline></svg>`;
+                countEl.className = "text-[10px] font-bold uppercase tracking-widest text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1.5";
+            }
+        }
+
+        function toggleFilterPane() {
+            const pane = document.getElementById('filter-pane');
+            if(pane.classList.contains('hidden')) {
+                renderFilterList(); pane.classList.remove('hidden');
+                setTimeout(() => { pane.classList.remove('opacity-0', 'scale-95'); }, 10);
+            } else {
+                pane.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => { pane.classList.add('hidden'); }, 200);
+            }
+        }
+
+        function renderFilterList() {
+            const list = document.getElementById('filter-checkbox-list');
+            const cats = [...new Set(starterLibrary.map(b => b.category))].sort();
+            list.innerHTML = '';
+            
+            const clearLabel = document.createElement('div');
+            clearLabel.className = "flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-rose-50 cursor-pointer transition-all border border-transparent hover:border-rose-100 mb-1 group";
+            clearLabel.innerHTML = `<div class="w-4 h-4 rounded border border-gray-200 bg-white flex items-center justify-center group-hover:border-rose-300"><svg class="w-2.5 h-2.5 text-rose-500 opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></div><span class="text-[10px] font-bold uppercase text-gray-400 group-hover:text-rose-600">Clear All</span>`;
+            clearLabel.onclick = (e) => { e.stopPropagation(); clearFilters(); };
+            list.appendChild(clearLabel);
+
+            cats.forEach(c => {
+                const active = activeCategories.includes(c);
+                const label = document.createElement('div');
+                label.className = "flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 cursor-pointer transition-all";
+                label.innerHTML = `<div class="w-4 h-4 rounded border ${active ? 'bg-indigo-500 border-indigo-500' : 'border-gray-200 bg-white'} flex items-center justify-center">${active ? '<svg class="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="4"><polyline points="20 6 9 17 4 12"></polyline></svg>' : ''}</div><span class="text-[11px] font-semibold ${active ? 'text-gray-900' : 'text-gray-500'}">${c}</span>`;
+                label.onclick = (e) => { e.stopPropagation(); toggleCategoryFilter(c); };
+                list.appendChild(label);
+            });
+        }
+
+        function toggleCategoryFilter(c) {
+            if(activeCategories.includes(c)) activeCategories = activeCategories.filter(x => x !== c); else activeCategories.push(c);
+            buildQuoteQueue(); renderLibrary('all'); renderFilterList(); nextQuoteManual();
+        }
+
+        function clearFilters() { activeCategories = []; buildQuoteQueue(); renderLibrary('all'); renderFilterList(); nextQuoteManual(); }
+
+        window.addEventListener('click', (e) => {
+            const pane = document.getElementById('filter-pane');
+            const trigger = document.getElementById('active-context-count');
+            if(pane && !pane.contains(e.target) && !trigger.contains(e.target) && !pane.classList.contains('hidden')) toggleFilterPane();
+        });
+
+        function startRotator() {
+            if(rotatorInterval) clearInterval(rotatorInterval);
+            timeLeft = 100;
+            rotatorInterval = setInterval(() => {
+                if(!isPaused && !isTransitioning) {
+                    timeLeft -= (100 / (DURATION / 100));
+                    updateRing(timeLeft);
+                    if(timeLeft <= 0) { clearInterval(rotatorInterval); nextQuote(); }
+                }
+            }, 100);
+        }
+
+        function updateRing(p) {
+            const circle = document.getElementById('progress-circle');
+            const circumference = 10 * 2 * Math.PI;
+            circle.style.strokeDashoffset = circumference - (p / 100) * circumference;
+        }
+
+        function nextQuote() { if(isTransitioning) return; currentQuoteIndex = (currentQuoteIndex + 1) % quoteQueue.length; transitionQuote(); }
+        function prevQuote() { if(isTransitioning) return; currentQuoteIndex = (currentQuoteIndex - 1 + quoteQueue.length) % quoteQueue.length; transitionQuote(); }
+        function nextQuoteManual() { if(isTransitioning) return; clearInterval(rotatorInterval); nextQuote(); }
+
+        function transitionQuote() {
+            isTransitioning = true;
+            const wrapper = document.getElementById('quote-wrapper');
+            const newQ = quoteQueue[currentQuoteIndex];
+            const slide = document.createElement('div');
+            slide.className = 'quote-slide flex flex-col items-center';
+            slide.innerHTML = buildSlideHTML(newQ);
+            
+            updateTrayUI(newQ);
+            wrapper.appendChild(slide);
+            
+            // Force a double-reflow to ensure browser has registered the initial state (opacity 0, translate 20px)
+            void slide.offsetWidth;
+            
+            // Add active class in the next animation frame
+            requestAnimationFrame(() => {
+                slide.classList.add('active');
+            });
+
+            const slides = wrapper.querySelectorAll('.quote-slide');
+            slides.forEach(s => {
+                if(s !== slide) {
+                    s.classList.remove('active');
+                    setTimeout(() => { if(s.parentNode === wrapper) wrapper.removeChild(s); }, 1400);
+                }
+            });
+            updateHeartUI(newQ);
+            setTimeout(() => { 
+                isTransitioning = false; 
+                if(!isPaused && !isTrayOpen) startRotator(); 
+            }, 1400);
+        }
+
+        function updateQuoteDOM(q) {
+            const wrapper = document.getElementById('quote-wrapper');
+            const slide = document.createElement('div');
+            slide.className = 'quote-slide active flex flex-col items-center';
+            slide.innerHTML = buildSlideHTML(q);
+            updateTrayUI(q);
+            wrapper.appendChild(slide);
+            updateHeartUI(q);
+        }
+
+        function buildSlideHTML(q) {
+            const len = q.text.length;
+            let sizeClass = "text-4xl md:text-5xl lg:text-6xl";
+            let whitespaceClass = "text-balance";
+            if(len < 25) whitespaceClass = "whitespace-nowrap";
+            if(len > 120) sizeClass = "text-2xl md:text-3xl lg:text-4xl";
+            else if(len > 70) sizeClass = "text-3xl md:text-4xl lg:text-5xl";
+            return `<div class="w-full px-6 md:px-12 flex justify-center"><div class="w-fit flex flex-col items-end max-w-4xl -translate-x-1"><div class="flex items-start"><span class="font-serif text-white opacity-60 text-4xl md:text-6xl mr-3 select-none leading-none mt-0.5">“</span><h2 class="quote-text font-serif font-medium text-white tracking-tight leading-relaxed drop-shadow-md transition-all duration-300 text-left ${sizeClass} ${whitespaceClass}">${cleanText(q.text)}<span class="opacity-60 ml-1 tracking-tighter select-none">”</span></h2></div><div onclick="jumpToBookContext()" class="quote-author mt-6 cursor-pointer group/meta pr-2"><p class="text-sm font-bold text-white/90 group-hover/meta:text-white transition-colors tracking-wide">— ${q.author}</p></div></div></div>`;
+        }
+
+        function updateTrayUI(q) {
+            document.getElementById('tray-category').textContent = q.category;
+            document.getElementById('tray-title').textContent = q.title;
+            document.getElementById('detail-summary').textContent = q.context;
+            const book = starterLibrary.find(b => b.id === q.bookId);
+            if(book) injectBlueprint(book);
+        }
+
+        function injectBlueprint(book) {
+            document.getElementById('detail-author').innerText = book.author;
+            const meta = metaData[book.id];
+            document.getElementById('spotify-link').href = meta.spotify || `https://open.spotify.com/search/${encodeURIComponent(book.title + " " + book.author)}`;
+            document.getElementById('detail-leverage').innerText = meta.leverage;
+            document.getElementById('detail-objective').innerText = meta.obj;
+            document.getElementById('detail-constraint').innerText = meta.con;
+            const list = document.getElementById('detail-quotes');
+            list.innerHTML = '';
+            book.quotes.forEach((qObj, i) => {
+                const isF = favorites.includes(qObj.text);
+                const li = document.createElement('li');
+                li.className = `group/quote flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50/50 px-2 transition-colors ${i !== book.quotes.length - 1 ? 'border-b border-gray-100' : ''}`;
+                li.innerHTML = `<div class="quote-nav-trigger flex-1 text-sm text-gray-700 italic leading-relaxed pr-4">“${qObj.text}”</div><div class="heart-trigger w-10 h-10 flex items-center justify-center shrink-0 transition-colors ${isF ? 'text-rose-500' : 'text-gray-200 hover:text-rose-400'}"><svg class="w-4 h-4" fill="${isF ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></div>`;
+                li.querySelector('.quote-nav-trigger').onclick = (e) => { e.stopPropagation(); const targetIdx = quoteQueue.findIndex(item => item.text === qObj.text); if (targetIdx !== -1) { currentQuoteIndex = targetIdx; transitionQuote(); showToast("Perspective Swapped"); const scrollArea = document.getElementById('blueprint-content'); if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'smooth' }); } };
+                li.querySelector('.heart-trigger').onclick = (e) => { e.stopPropagation(); if(favorites.includes(qObj.text)) favorites = favorites.filter(f => f !== qObj.text); else favorites.push(qObj.text); saveState(); injectBlueprint(book); buildQuoteQueue(); updateHeartUI(quoteQueue[currentQuoteIndex]); };
+                list.appendChild(li);
+            });
+        }
+
+        function updateHeartUI(q) {
+            const btn = document.getElementById('rotator-heart');
+            const svg = btn.querySelector('svg');
+            if(favorites.includes(q.text)) { btn.classList.add('bg-white/30'); svg.setAttribute('fill', 'white'); svg.setAttribute('stroke', 'white'); } 
+            else { btn.classList.remove('bg-white/30'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); }
+        }
+
+        function toggleHeartCurrent() { const q = quoteQueue[currentQuoteIndex]; if(favorites.includes(q.text)) favorites = favorites.filter(f => f !== q.text); else favorites.push(q.text); saveState(); updateHeartUI(q); buildQuoteQueue(); }
+
+        function toggleDetail(e) {
+            const view = document.getElementById('detail-view');
+            isTrayOpen = !isTrayOpen;
+            if(isTrayOpen) { view.classList.add('detail-expanded'); isPaused = true; if(rotatorInterval) clearInterval(rotatorInterval); } 
+            else { view.classList.remove('detail-expanded'); isPaused = false; startRotator(); }
+        }
+
+        function jumpToBookContext() { const q = quoteQueue[currentQuoteIndex]; const book = starterLibrary.find(b => b.title === q.title); if (book) { showDetail(book); document.getElementById('detail-view').scrollIntoView({ behavior: 'smooth' }); } }
+
+        function flipBack() {
+            const view = document.getElementById('detail-view');
+            const scene = document.getElementById('main-scene');
+            scene.classList.remove('expanded-scene');
+            view.classList.remove('synopsis-mode');
+            setTimeout(() => {
+                document.getElementById('flip-container').classList.remove('is-flipped');
+                const currentQ = quoteQueue[currentQuoteIndex];
+                updateTrayUI(currentQ);
+                isPaused = false;
+                startRotator();
+            }, 600);
+        }
+
+        function injectFlipInsights(book) {
+            const list = document.getElementById('flip-insights-list');
+            list.innerHTML = '';
+            book.quotes.forEach((qObj, i) => {
+                const isF = favorites.includes(qObj.text);
+                const li = document.createElement('li');
+                li.className = `group/flip-quote flex items-center justify-between py-4 transition-colors ${i !== book.quotes.length - 1 ? 'border-b border-gray-50' : ''}`;
+                li.innerHTML = `<div class="flex-1 text-sm text-gray-600 italic leading-relaxed pr-4">“${qObj.text}”</div><div class="flip-heart-trigger w-10 h-10 flex items-center justify-center shrink-0 cursor-pointer transition-colors ${isF ? 'text-rose-500' : 'text-gray-200 hover:text-rose-400'}"><svg class="w-4 h-4" fill="${isF ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></div>`;
+                li.querySelector('.flip-heart-trigger').onclick = (e) => { 
+                    e.stopPropagation(); 
+                    if(favorites.includes(qObj.text)) favorites = favorites.filter(f => f !== qObj.text); else favorites.push(qObj.text); 
+                    saveState(); 
+                    injectFlipInsights(book);
+                    injectBlueprint(book); 
+                    buildQuoteQueue(); 
+                    updateHeartUI(quoteQueue[currentQuoteIndex]); 
+                };
+                list.appendChild(li);
+            });
+        }
+
+        function showDetail(book) {
+            const view = document.getElementById('detail-view');
+            const flipContainer = document.getElementById('flip-container');
+            const scene = document.getElementById('main-scene');
+            const scrollArea = document.getElementById('flip-scroll-area');
+
+            if (book.synopsis) {
+                isPaused = true;
+                clearInterval(rotatorInterval);
+                const performFlip = () => {
+                    document.getElementById('flip-book-title').textContent = book.title;
+                    document.getElementById('flip-book-category').textContent = book.category;
+                    document.getElementById('flip-book-author-line').textContent = "by " + book.author;
+                    document.getElementById('flip-chapter-content').innerHTML = book.synopsis;
+                    injectFlipInsights(book);
+                    if(scrollArea) scrollArea.scrollTop = 0;
+                    const meta = metaData[book.id];
+                    document.getElementById('flip-spotify-link').href = meta.spotify || `https://open.spotify.com/search/${encodeURIComponent(book.title + " " + book.author)}`;
+                    scene.classList.add('expanded-scene');
+                    flipContainer.classList.add('is-flipped');
+                    view.classList.add('synopsis-mode');
+                    isTrayOpen = false;
+                };
+                if (isTrayOpen || document.querySelector('.detail-expanded')) {
+                    view.classList.remove('detail-expanded');
+                    setTimeout(performFlip, 600);
+                } else { performFlip(); }
+            } else {
+                const performJump = () => {
+                    injectBlueprint(book);
+                    document.getElementById('tray-title').textContent = book.title;
+                    document.getElementById('tray-category').textContent = book.category;
+                    document.getElementById('detail-summary').textContent = book.quotes[0].context;
+                    view.classList.add('detail-expanded');
+                    const blueprintScroll = document.getElementById('blueprint-content');
+                    if(blueprintScroll) blueprintScroll.scrollTop = 0;
+                    isTrayOpen = true; isPaused = true; clearInterval(rotatorInterval);
+                };
+                if (isTrayOpen) { view.classList.remove('detail-expanded'); isTrayOpen = false; setTimeout(performJump, 600); } else { performJump(); }
+            }
+        }
+
+        function renderLibrary(filter) {
+            const list = document.getElementById('library-list');
+            list.innerHTML = '';
+            const books = (filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(q => favorites.includes(q.text)))).filter(b => activeCategories.length === 0 || activeCategories.includes(b.category));
+            const cats = {};
+            books.forEach(b => { if(!cats[b.category]) cats[b.category] = []; cats[b.category].push(b); });
+            Object.keys(cats).sort().forEach(c => {
+                const active = activeCategories.includes(c);
+                const tile = document.createElement('details'); tile.open = true; tile.className = "category-tile bg-white rounded-xl border border-gray-100 mb-3 overflow-hidden transition-all";
+                tile.innerHTML = `<summary class="flex items-center justify-between px-3 py-3 cursor-pointer select-none"><span class="category-name text-[10px] font-bold uppercase tracking-widest ${active ? 'text-indigo-600' : 'text-gray-500'} hover:text-indigo-500 transition-colors">${c}</span><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-gray-300">${cats[c].length}</span><div class="category-chevron w-4 h-4 transition-transform duration-300"><svg class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div></summary>`;
+                const bookDiv = document.createElement('div');
+                bookDiv.className = "px-1 pb-2 space-y-1 border-t border-gray-50 pt-2";
+                cats[c].forEach(b => {
+                    const item = document.createElement('div');
+                    item.className = "px-3 py-2 text-[12px] text-gray-700 truncate cursor-pointer hover:bg-gray-50 rounded-lg";
+                    item.textContent = b.title;
+                    item.onclick = () => showDetail(b);
+                    bookDiv.appendChild(item);
+                });
+                tile.appendChild(bookDiv); list.appendChild(tile);
+            });
+        }
+
+        function setFilter(type) {
+            document.getElementById('filter-all').className = type === 'all' ? "flex-1 py-1.5 text-[11px] font-bold uppercase rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200" : "flex-1 py-1.5 text-[11px] font-medium uppercase text-gray-500 hover:text-gray-700";
+            document.getElementById('filter-favorites').className = type === 'favorites' ? "flex-1 py-1.5 text-[11px] font-bold uppercase rounded-[4px] bg-white text-gray-900 shadow-sm border border-gray-200" : "flex-1 py-1.5 text-[11px] font-medium uppercase text-gray-500 hover:text-gray-700";
+            renderLibrary(type);
+        }
+
+        function handleSearch(val) {
+            const query = val.toLowerCase();
+            const list = document.getElementById('library-list');
+            
+            // Check which button is active (Library vs Saved)
+            const isFavFilter = document.getElementById('filter-favorites').classList.contains('bg-gray-900') || 
+                               document.getElementById('filter-favorites').classList.contains('text-gray-900');
+            const filter = isFavFilter ? 'favorites' : 'all';
+            
+            let books = filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(x => favorites.includes(x.text)));
+            
+            // LOGIC: If user is typing, search ALL books in the current view (Library or Saved)
+            // If search is EMPTY, fall back to active topic filters.
+            if (query) {
+                books = books.filter(b => b.title.toLowerCase().includes(query) || b.author.toLowerCase().includes(query) || b.category.toLowerCase().includes(query));
+            } else if (activeCategories.length > 0) {
+                books = books.filter(b => activeCategories.includes(b.category));
+            }
+            
+            list.innerHTML = '';
+            const cats = {};
+            books.forEach(b => { if(!cats[b.category]) cats[b.category] = []; cats[b.category].push(b); });
+            Object.keys(cats).sort().forEach(c => {
+                const active = activeCategories.includes(c);
+                const tile = document.createElement('details'); tile.open = true; tile.className = "category-tile bg-white rounded-xl border border-gray-100 mb-3 overflow-hidden transition-all";
+                tile.innerHTML = `<summary class="flex items-center justify-between px-3 py-3 cursor-pointer select-none"><span class="category-name text-[10px] font-bold uppercase tracking-widest ${active ? 'text-indigo-600' : 'text-gray-500'} hover:text-indigo-500 transition-colors">${c}</span><div class="flex items-center gap-3"><span class="text-[10px] font-bold text-gray-300">${cats[c].length}</span><div class="category-chevron w-4 h-4 transition-transform duration-300"><svg class="w-3.5 h-3.5 text-gray-300" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg></div></div></summary>`;
+                const bookDiv = document.createElement('div');
+                bookDiv.className = "px-1 pb-2 space-y-1 border-t border-gray-50 pt-2";
+                cats[c].forEach(b => {
+                    const item = document.createElement('div');
+                    item.className = "px-3 py-2 text-[12px] text-gray-700 truncate cursor-pointer hover:bg-gray-50 rounded-lg";
+                    item.textContent = b.title;
+                    item.onclick = () => showDetail(b);
+                    bookDiv.appendChild(item);
+                });
+                tile.appendChild(bookDiv); list.appendChild(tile);
+            });
+        }
+
+        function toggleAddModal() { const modal = document.getElementById('add-modal'); if(modal.classList.contains('hidden')) { modal.classList.remove('hidden'); setTimeout(() => { modal.classList.remove('opacity-0'); modal.querySelector('div').classList.remove('scale-95'); }, 10); } else { modal.classList.add('opacity-0'); modal.querySelector('div').classList.add('scale-95'); setTimeout(() => modal.classList.add('hidden'), 200); } }
+        function pauseTimer() { isPaused = true; }
+        function resumeTimer() { isPaused = false; }
+        function cleanText(text) { return text.replace(/"/g, '').replace(/'/g, '’').replace(/\.\.\./g, '…'); }
+        function showToast(msg) { const toast = document.getElementById('toast'); toast.textContent = msg; toast.classList.remove('opacity-0'); setTimeout(() => toast.classList.add('opacity-0'), 2000); }
+        document.getElementById('add-form').addEventListener('submit', (e) => { e.preventDefault(); const newBook = { id: Date.now(), title: document.getElementById('input-title').value, author: document.getElementById('input-author').value, category: document.getElementById('input-category').value, summary: document.getElementById('input-summary').value, quotes: document.getElementById('input-quotes').value.split('\n').filter(line => line.trim() !== '').map(q => ({ text: q, context: "Self-added insight." })) }; starterLibrary.unshift(newBook); buildQuoteQueue(); renderLibrary('all'); toggleAddModal(); e.target.reset(); });
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
