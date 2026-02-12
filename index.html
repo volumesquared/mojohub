@@ -71,7 +71,7 @@
                 window.isOwner = true;
                 document.getElementById('login-btn').classList.add('hidden');
                 document.getElementById('owner-status').classList.remove('hidden');
-                showToast("Ka | Owner Sync Active");
+                showToast("Ka Sync Active");
                 await syncLibrary();
             }
         }
@@ -122,7 +122,7 @@
                 <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
                 <div id="owner-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
                     <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka | Owner</span>
+                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka</span>
                 </div>
             </div>
         </div>
