@@ -27,14 +27,12 @@
         
         .progress-ring__circle { transition: stroke-dashoffset 0.1s linear; transform: rotate(-90deg); transform-origin: 50% 50%; }
 
-        /* REFINED TRAY ARCHITECTURE */
         #detail-view { height: 56px; transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease; overflow: hidden; display: flex; flex-direction: column; }
         #detail-view.detail-expanded { height: 85vh; }
         #detail-view.synopsis-mode { height: 0; opacity: 0; margin-top: 0; border: none; pointer-events: none; }
         .detail-fixed-header { flex-shrink: 0; }
         .detail-scroll-area { flex-grow: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-        /* FLIP SYSTEM */
         .scene { perspective: 2000px; width: 100%; position: relative; min-height: 420px; z-index: 20; transition: min-height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
         .scene.expanded-scene { min-height: 85vh; }
         .flip-container { position: relative; width: 100%; height: 100%; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); transform-style: preserve-3d; }
@@ -43,7 +41,6 @@
         .card-front { z-index: 2; position: relative; border-radius: 1rem 1rem 0 0; }
         .card-back { transform: rotateY(180deg); z-index: 1; display: flex; flex-direction: column; background: white; border: 1px solid #e5e7eb; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 1rem; }
 
-        /* CUSTOM SCROLLBAR FOR CONTENT AREA */
         .content-scroll::-webkit-scrollbar { width: 6px; }
         .content-scroll::-webkit-scrollbar-track { background: transparent; }
         .content-scroll::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
@@ -56,179 +53,30 @@
         .category-tile[open] .category-chevron { transform: rotate(180deg); }
     </style>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    <script>
-        // Use a standard script to avoid CORS issues with modules when running via file://
-        const supabaseConfig = {
-            url: 'https://oqlpaplongrcbsxczubo.supabase.co',
-            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbHBhcGxvbmdyY2JzeGN6dWJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjM0NDksImV4cCI6MjA4NjQzOTQ0OX0.lu5eNniYJgHzDwrrYOJgA_MG6Md3lGtYCVbwGvTsQrw'
-        };
-        window.supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.key);
-        
-        // CORE STATE
-        window.isOwner = false;
-        let savedItems = new Set();
-        let activeFilter = 'all';
-        let isTrayOpen = false;
-        let currentQuoteIndex = 0;
-        let quoteQueue = [];
-        let isPaused = false;
-        let rotatorInterval;
-        let progress = 0;
-        const ROTATOR_SPEED = 7000;
-
-        function closeAuthModal() {
-            document.getElementById('login-modal').classList.add('hidden');
-        }
-
-        async function triggerOwnerAuth() {
-            document.getElementById('login-modal').classList.remove('hidden');
-            document.getElementById('auth-email').focus();
-        }
-
-        // Initialize Session and Listeners
-        window.addEventListener('load', async () => {
-            // Restore Guest Session initially
-            const localData = localStorage.getItem('mjh_saved_guest');
-            savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
-            updateSavedUI();
-
-            // Check for existing session
-            const { data: { session } } = await window.supabaseClient.auth.getSession();
-            if (session) {
-                setOwnerState(true);
-                await syncLibrary();
-            }
-
-            // Listen for auth changes
-            window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                if (event === 'SIGNED_IN') {
-                    setOwnerState(true);
-                    await syncLibrary();
-                } else if (event === 'SIGNED_OUT') {
-                    setOwnerState(false);
-                }
-            });
-
-            buildQuoteQueue();
-            startRotator();
-            renderLibrary();
-            updateActiveContextCount();
-        });
-
-        function setOwnerState(active) {
-            window.isOwner = active;
-            if (active) {
-                document.getElementById('login-btn').classList.add('hidden');
-                document.getElementById('owner-status').classList.remove('hidden');
-            } else {
-                document.getElementById('login-btn').classList.remove('hidden');
-                document.getElementById('owner-status').classList.add('hidden');
-                // Restore Guest Session from LocalStorage
-                const localData = localStorage.getItem('mjh_saved_guest');
-                savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
-                updateSavedUI();
-            }
-        }
-
-        async function handleSignOut() {
-            const { error } = await window.supabaseClient.auth.signOut();
-            if (!error) {
-                showToast("Signed Out");
-                location.reload(); 
-            }
-        }
-
-        async function handleLoginSubmit() {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            
-            if (email && password) {
-                const { data, error } = await window.supabaseClient.auth.signInWithPassword({
-                    email: email,
-                    password: password,
-                });
-
-                if (error) {
-                    showToast("Auth Failed: " + error.message);
-                } else {
-                    setOwnerState(true);
-                    closeAuthModal();
-                    document.getElementById('library-search').value = '';
-                    handleSearch(''); 
-                    showToast("Ka Sync Active");
-                    await syncLibrary();
-                }
-            }
-        }
-
-        async function syncLibrary() {
-            savedItems = new Set();
-            if (window.isOwner) {
-                const { data, error } = await window.supabaseClient.from('saved_items').select('book_id');
-                if (!error && data) {
-                    data.forEach(item => savedItems.add(item.book_id));
-                }
-            } else {
-                const localData = localStorage.getItem('mjh_saved_guest');
-                if (localData) {
-                    const parsed = JSON.parse(localData);
-                    parsed.forEach(id => savedItems.add(id));
-                }
-            }
-            updateSavedUI();
-        }
-
-        async function toggleSavePersistence(bookId) {
-            if (window.isOwner) {
-                const { data: { user } } = await window.supabaseClient.auth.getUser();
-                if (savedItems.has(bookId)) {
-                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
-                    savedItems.delete(bookId);
-                } else {
-                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
-                    savedItems.add(bookId);
-                }
-            } else {
-                if (savedItems.has(bookId)) savedItems.delete(bookId);
-                else savedItems.add(bookId);
-                localStorage.setItem('mjh_saved_guest', JSON.stringify([...savedItems]));
-            }
-            updateSavedUI();
-        }
-
-        function updateSavedUI() {
-            document.getElementById('saved-count').textContent = `(${savedItems.size})`;
-            if (activeFilter === 'favorites') renderLibrary();
-            buildQuoteQueue(); // Sync rotator with new saves
-        }
-
-        function setFilter(type) {
-            activeFilter = type;
-            const libBtn = document.getElementById('filter-all');
-            const favBtn = document.getElementById('filter-favorites');
-            
-            if (type === 'all') {
-                libBtn.className = "flex-1 py-1.5 text-[10px] font-bold uppercase rounded-md bg-gray-900 text-white shadow-sm transition-all flex items-center justify-center gap-2";
-                favBtn.className = "flex-1 py-1.5 text-[10px] font-medium uppercase rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 transition-all flex items-center justify-center gap-2";
-            } else {
-                favBtn.className = "flex-1 py-1.5 text-[10px] font-bold uppercase rounded-md bg-gray-900 text-white shadow-sm transition-all flex items-center justify-center gap-2";
-                libBtn.className = "flex-1 py-1.5 text-[10px] font-medium uppercase rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-200/50 transition-all flex items-center justify-center gap-2";
-            }
-            renderLibrary();
-        }
-
-        function renderLibrary() {
-            const container = document.getElementById('library-list');
-            const searchVal = document.getElementById('library-search').value.toLowerCase();
-            
-            const filtered = starterLibrary.filter(book => {
-                const matchesSearch = book.title.toLowerCase().includes(searchVal) || book.author.toLowerCase().includes(searchVal);
-                const matchesTopic = activeTopics.has(book.category);
-                const matchesFilter = activeFilter === 'all' || savedItems.has(book.id);
-                return matchesSearch && matchesTopic && matchesFilter;
-            });
-
-            // ... (rest of render logic remains the same, will continue in next turn if needed)
-        }
-    </script>
 </head>
+<body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
+
+    <header class="w-full bg-white border-b border-gray-200 z-10 shrink-0 h-14">
+        <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="flex gap-1.5 opacity-40 hover:opacity-100 transition-opacity">
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                    <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
+                </div>
+                <span class="ml-4 font-semibold text-xs tracking-widest text-gray-500">MojoHUB OS | Alex</span>
+            </div>
+            <div id="auth-section" class="flex items-center gap-4">
+                <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
+                <div id="owner-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
+                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka</span>
+                    <button onclick="handleSignOut()" class="ml-1 text-indigo-300 hover:text-indigo-600 transition-colors" title="Sign Out">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    <!-- [MojoHUB Alex v3.3 Body and Script Logic with v3.5 Secure Separation to follow] -->
+</body>
+</html>
