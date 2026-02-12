@@ -101,7 +101,9 @@
             } else {
                 document.getElementById('login-btn').classList.remove('hidden');
                 document.getElementById('owner-status').classList.add('hidden');
-                savedItems.clear(); // Clear memory on logout
+                // Switch back to Guest Data
+                const localData = localStorage.getItem('mjh_saved_guest');
+                savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
                 updateSavedUI();
             }
         }
@@ -149,31 +151,39 @@
 
         async function syncLibrary() {
             if (window.isOwner) {
-                const { data, error } = await window.supabaseClient.from('saved_items').select('*');
+                const { data, error } = await window.supabaseClient.from('saved_items').select('book_id');
                 if (!error && data) {
-                    const dbIds = data.map(item => item.book_id);
-                    savedItems = new Set([...savedItems, ...dbIds]);
+                    savedItems = new Set(data.map(item => item.book_id));
                     updateSavedUI();
                 }
+            } else {
+                // Restore Guest Session from LocalStorage
+                const localData = localStorage.getItem('mjh_saved_guest');
+                savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
+                updateSavedUI();
             }
         }
 
         async function toggleSavePersistence(bookId) {
             if (window.isOwner) {
+                // OWNER MODE: Sync with Supabase ONLY
                 const { data: { user } } = await window.supabaseClient.auth.getUser();
                 if (savedItems.has(bookId)) {
                     await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
+                    savedItems.delete(bookId);
                 } else {
                     await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
+                    savedItems.add(bookId);
                 }
-            }
-            // Always update local for instant UI response
-            if (savedItems.has(bookId)) {
-                savedItems.delete(bookId);
             } else {
-                savedItems.add(bookId);
+                // GUEST MODE: LocalStorage ONLY
+                if (savedItems.has(bookId)) {
+                    savedItems.delete(bookId);
+                } else {
+                    savedItems.add(bookId);
+                }
+                localStorage.setItem('mjh_saved_guest', JSON.stringify([...savedItems]));
             }
-            localStorage.setItem('mjh_saved', JSON.stringify([...savedItems]));
             updateSavedUI();
         }
     </script>
