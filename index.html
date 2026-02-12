@@ -74,6 +74,46 @@
             document.getElementById('auth-email').focus();
         }
 
+        // Initialize Session and Listeners
+        window.addEventListener('load', async () => {
+            // Check for existing session on load
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            if (session) {
+                setOwnerState(true);
+                await syncLibrary();
+            }
+
+            // Listen for auth changes
+            window.supabaseClient.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN') {
+                    setOwnerState(true);
+                } else if (event === 'SIGNED_OUT') {
+                    setOwnerState(false);
+                }
+            });
+        });
+
+        function setOwnerState(active) {
+            window.isOwner = active;
+            if (active) {
+                document.getElementById('login-btn').classList.add('hidden');
+                document.getElementById('owner-status').classList.remove('hidden');
+            } else {
+                document.getElementById('login-btn').classList.remove('hidden');
+                document.getElementById('owner-status').classList.add('hidden');
+                savedItems.clear(); // Clear memory on logout
+                updateSavedUI();
+            }
+        }
+
+        async function handleSignOut() {
+            const { error } = await window.supabaseClient.auth.signOut();
+            if (!error) {
+                showToast("Signed Out");
+                location.reload(); // Refresh to clean state
+            }
+        }
+
         async function handleLoginSubmit() {
             const email = document.getElementById('auth-email').value;
             const password = document.getElementById('auth-password').value;
@@ -87,14 +127,10 @@
                 if (error) {
                     showToast("Auth Failed: " + error.message);
                 } else {
-                    window.isOwner = true;
-                    // Clear autofilled search if present
+                    // Success is handled by onAuthStateChange listener
+                    closeAuthModal();
                     document.getElementById('library-search').value = '';
                     handleSearch(''); 
-                    
-                    closeAuthModal();
-                    document.getElementById('login-btn').classList.add('hidden');
-                    document.getElementById('owner-status').classList.remove('hidden');
                     showToast("Ka Sync Active");
                     await syncLibrary();
                 }
@@ -158,6 +194,9 @@
                 <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
                 <div id="owner-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
                     <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka</span>
+                    <button onclick="handleSignOut()" class="ml-1 text-indigo-300 hover:text-indigo-600 transition-colors" title="Sign Out">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
                 </div>
             </div>
         </div>
