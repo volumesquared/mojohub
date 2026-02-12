@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MojoHub 3.2 | Studio Flip</title>
+    <title>MojoHUB OS | Alex</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,10 +67,11 @@
         
         async function triggerOwnerAuth() {
             const pin = prompt("Enter Owner PIN to Sync:");
-            if (pin === "2026") { // A simple PIN for now, can be upgraded to full Auth later
+            if (pin === "2026") { 
                 window.isOwner = true;
-                document.getElementById('auth-status').classList.remove('hidden');
-                showToast("Owner Sync Activated");
+                document.getElementById('login-btn').classList.add('hidden');
+                document.getElementById('owner-status').classList.remove('hidden');
+                showToast("Ka | Owner Sync Active");
                 await syncLibrary();
             }
         }
@@ -115,11 +116,14 @@
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                 </div>
-                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500 cursor-pointer" onclick="triggerOwnerAuth()">MojoHub 3.4 | Blu</span>
+                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHUB OS | Alex</span>
             </div>
-            <div id="auth-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 animate-pulse">
-                <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Owner Sync Active</span>
+            <div id="auth-section" class="flex items-center gap-4">
+                <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
+                <div id="owner-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
+                    <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka | Owner</span>
+                </div>
             </div>
         </div>
     </header>
