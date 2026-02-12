@@ -65,9 +65,18 @@
         window.supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.key);
         window.isOwner = false;
         
+        function closeAuthModal() {
+            document.getElementById('login-modal').classList.add('hidden');
+        }
+
         async function triggerOwnerAuth() {
-            const email = prompt("Enter Owner Email:");
-            const password = prompt("Enter Password:");
+            document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('auth-email').focus();
+        }
+
+        async function handleLoginSubmit() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
             
             if (email && password) {
                 const { data, error } = await window.supabaseClient.auth.signInWithPassword({
@@ -79,6 +88,7 @@
                     showToast("Auth Failed: " + error.message);
                 } else {
                     window.isOwner = true;
+                    closeAuthModal();
                     document.getElementById('login-btn').classList.add('hidden');
                     document.getElementById('owner-status').classList.remove('hidden');
                     showToast("Ka Sync Active");
@@ -86,6 +96,16 @@
                 }
             }
         }
+
+        // Handle Enter key for login
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !document.getElementById('login-modal').classList.contains('hidden')) {
+                handleLoginSubmit();
+            }
+            if (e.key === 'Escape') {
+                closeAuthModal();
+            }
+        });
 
         async function syncLibrary() {
             if (window.isOwner) {
@@ -306,6 +326,30 @@
             <div id="library-list" class="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-hide pb-20"></div>
         </aside>
     </main>
+
+    <!-- AUTH MODAL OVERLAY -->
+    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 p-8 transform transition-all">
+            <div class="flex flex-col gap-6">
+                <div class="space-y-1">
+                    <h3 class="text-xl font-serif font-bold text-gray-900">Owner Access</h3>
+                    <p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identify yourself to sync</p>
+                </div>
+                <div class="space-y-4">
+                    <div class="space-y-1">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Email</label>
+                        <input type="email" id="auth-email" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" placeholder="pang@volumesquared.com">
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Password</label>
+                        <input type="password" id="auth-password" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••">
+                    </div>
+                </div>
+                <button onclick="handleLoginSubmit()" class="w-full py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-lg text-xs font-bold tracking-widest uppercase mt-2">Sign In</button>
+            </div>
+        </div>
+    </div>
 
     <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50"></div>
 
