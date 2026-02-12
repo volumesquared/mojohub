@@ -66,13 +66,24 @@
         window.isOwner = false;
         
         async function triggerOwnerAuth() {
-            const pin = prompt("Enter Owner PIN to Sync:");
-            if (pin === "2026") { 
-                window.isOwner = true;
-                document.getElementById('login-btn').classList.add('hidden');
-                document.getElementById('owner-status').classList.remove('hidden');
-                showToast("Ka Sync Active");
-                await syncLibrary();
+            const email = prompt("Enter Owner Email:");
+            const password = prompt("Enter Password:");
+            
+            if (email && password) {
+                const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password,
+                });
+
+                if (error) {
+                    showToast("Auth Failed: " + error.message);
+                } else {
+                    window.isOwner = true;
+                    document.getElementById('login-btn').classList.add('hidden');
+                    document.getElementById('owner-status').classList.remove('hidden');
+                    showToast("Ka Sync Active");
+                    await syncLibrary();
+                }
             }
         }
 
@@ -89,10 +100,11 @@
 
         async function toggleSavePersistence(bookId) {
             if (window.isOwner) {
+                const { data: { user } } = await window.supabaseClient.auth.getUser();
                 if (savedItems.has(bookId)) {
-                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId);
+                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
                 } else {
-                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId }]);
+                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
                 }
             }
             // Always update local for instant UI response
