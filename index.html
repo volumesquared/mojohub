@@ -76,6 +76,11 @@
 
         // Initialize Session and Listeners
         window.addEventListener('load', async () => {
+            // Restore Guest Session from LocalStorage initially
+            const localData = localStorage.getItem('mjh_saved_guest');
+            savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
+            updateSavedUI();
+
             // Check for existing session on load
             const { data: { session } } = await window.supabaseClient.auth.getSession();
             if (session) {
@@ -84,9 +89,10 @@
             }
 
             // Listen for auth changes
-            window.supabaseClient.auth.onAuthStateChange((event, session) => {
+            window.supabaseClient.auth.onAuthStateChange(async (event, session) => {
                 if (event === 'SIGNED_IN') {
                     setOwnerState(true);
+                    await syncLibrary();
                 } else if (event === 'SIGNED_OUT') {
                     setOwnerState(false);
                 }
