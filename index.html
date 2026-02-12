@@ -63,8 +63,46 @@
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9xbHBhcGxvbmdyY2JzeGN6dWJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjM0NDksImV4cCI6MjA4NjQzOTQ0OX0.lu5eNniYJgHzDwrrYOJgA_MG6Md3lGtYCVbwGvTsQrw'
         };
         window.supabaseClient = supabase.createClient(supabaseConfig.url, supabaseConfig.key);
-        // Helper for Ka
-        window.supabaseclient = window.supabaseClient;
+        window.isOwner = false;
+        
+        async function triggerOwnerAuth() {
+            const pin = prompt("Enter Owner PIN to Sync:");
+            if (pin === "2026") { // A simple PIN for now, can be upgraded to full Auth later
+                window.isOwner = true;
+                document.getElementById('auth-status').classList.remove('hidden');
+                showToast("Owner Sync Activated");
+                await syncLibrary();
+            }
+        }
+
+        async function syncLibrary() {
+            if (window.isOwner) {
+                const { data, error } = await window.supabaseClient.from('saved_items').select('*');
+                if (!error && data) {
+                    const dbIds = data.map(item => item.book_id);
+                    savedItems = new Set([...savedItems, ...dbIds]);
+                    updateSavedUI();
+                }
+            }
+        }
+
+        async function toggleSavePersistence(bookId) {
+            if (window.isOwner) {
+                if (savedItems.has(bookId)) {
+                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId);
+                } else {
+                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId }]);
+                }
+            }
+            // Always update local for instant UI response
+            if (savedItems.has(bookId)) {
+                savedItems.delete(bookId);
+            } else {
+                savedItems.add(bookId);
+            }
+            localStorage.setItem('mjh_saved', JSON.stringify([...savedItems]));
+            updateSavedUI();
+        }
     </script>
 </head>
 <body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
@@ -77,7 +115,11 @@
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                 </div>
-                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHub 3.3 | Alex</span>
+                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500 cursor-pointer" onclick="triggerOwnerAuth()">MojoHub 3.4 | Blu</span>
+            </div>
+            <div id="auth-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 animate-pulse">
+                <div class="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Owner Sync Active</span>
             </div>
         </div>
     </header>
