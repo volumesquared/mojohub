@@ -135,10 +135,13 @@
                 if (error) {
                     showToast("Auth Failed: " + error.message);
                 } else {
-                    // Success is handled by onAuthStateChange listener
+                    // FORCE UI UPDATE IMMEDIATELY
+                    setOwnerState(true);
+                    
                     closeAuthModal();
                     document.getElementById('library-search').value = '';
                     handleSearch(''); 
+                    
                     showToast("Ka Sync Active");
                     await syncLibrary();
                 }
@@ -156,18 +159,23 @@
         });
 
         async function syncLibrary() {
+            // WIPE CURRENT MEMORY TO PREVENT MIRRORING
+            savedItems = new Set();
+            
             if (window.isOwner) {
                 const { data, error } = await window.supabaseClient.from('saved_items').select('book_id');
                 if (!error && data) {
-                    savedItems = new Set(data.map(item => item.book_id));
-                    updateSavedUI();
+                    data.forEach(item => savedItems.add(item.book_id));
                 }
             } else {
                 // Restore Guest Session from LocalStorage
                 const localData = localStorage.getItem('mjh_saved_guest');
-                savedItems = localData ? new Set(JSON.parse(localData)) : new Set();
-                updateSavedUI();
+                if (localData) {
+                    const parsed = JSON.parse(localData);
+                    parsed.forEach(id => savedItems.add(id));
+                }
             }
+            updateSavedUI();
         }
 
         async function toggleSavePersistence(bookId) {
