@@ -66,7 +66,8 @@
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                 </div>
-                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHUB OS | Alex</span>
+                <span class="ml-4 font-semibold text-xs tracking-widest text-gray-500">MojoHUB OS | Alex</span>
+            </div>
             <div id="auth-section" class="flex items-center gap-4">
                 <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
                 <div id="owner-status" class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
@@ -248,33 +249,6 @@
         </aside>
     </main>
 
-    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
-        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
-        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 p-8">
-            <div class="flex flex-col gap-6">
-                <div class="space-y-1"><h3 class="text-xl font-serif font-bold text-gray-900">Owner Access</h3><p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identify yourself to sync</p></div>
-                <div class="space-y-4">
-                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Email</label><input type="email" id="auth-email" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500" placeholder="email@address.com" autocomplete="off"></div>
-                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Password</label><input type="password" id="auth-password" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500" placeholder="••••••••"></div>
-                </div>
-                <button onclick="handleLoginSubmit()" class="w-full py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-lg text-xs font-bold tracking-widest uppercase">Sign In</button>
-            </div>
-        </div>
-    </div>
-    <!-- AUTH MODAL OVERLAY -->
-    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
-        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
-        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 p-8 transform transition-all">
-            <div class="flex flex-col gap-6">
-                <div class="space-y-1"><h3 class="text-xl font-serif font-bold text-gray-900">Owner Access</h3><p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identify yourself to sync</p></div>
-                <div class="space-y-4">
-                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Email</label><input type="email" id="auth-email" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" placeholder="email@address.com" autocomplete="off"></div>
-                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Password</label><input type="password" id="auth-password" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500 transition-colors" placeholder="••••••••"></div>
-                </div>
-                <button onclick="handleLoginSubmit()" class="w-full py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-lg text-xs font-bold tracking-widest uppercase mt-2">Sign In</button>
-            </div>
-        </div>
-    </div>
     <!-- AUTH MODAL OVERLAY -->
     <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
         <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
