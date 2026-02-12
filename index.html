@@ -88,6 +88,10 @@
                     showToast("Auth Failed: " + error.message);
                 } else {
                     window.isOwner = true;
+                    // Clear autofilled search if present
+                    document.getElementById('library-search').value = '';
+                    handleSearch(''); 
+                    
                     closeAuthModal();
                     document.getElementById('login-btn').classList.add('hidden');
                     document.getElementById('owner-status').classList.remove('hidden');
@@ -295,7 +299,7 @@
         <aside class="order-2 md:order-1 col-span-12 md:col-span-4 lg:col-span-3 flex flex-col gap-4 h-full overflow-hidden">
             <div class="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col gap-3 shrink-0">
                 <div class="relative group">
-                    <input type="text" id="library-search" oninput="handleSearch(this.value)" placeholder="Search wisdom..." class="w-full bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 text-xs outline-none">
+                    <input type="text" id="library-search" oninput="handleSearch(this.value)" placeholder="Search wisdom..." autocomplete="off" class="w-full bg-gray-50 border border-gray-100 rounded-lg pl-8 pr-3 py-2 text-xs outline-none">
                     <svg class="absolute left-2.5 top-2.5 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 </div>
                 <div class="flex gap-2 bg-gray-100/50 p-1 rounded-lg border border-gray-200/50">
