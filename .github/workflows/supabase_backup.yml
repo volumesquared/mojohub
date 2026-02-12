@@ -1,0 +1,27 @@
+name: Supabase Data Backup
+
+on:
+  schedule:
+    - cron: '0 4 * * *' # 11 PM PT is 7 AM UTC / 2 AM ET is 7 AM UTC. Let's run at 4 AM ET (8 AM UTC)
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Fetch saved items
+        run: |
+          curl -X GET "${{ secrets.SUPABASE_URL }}/rest/v1/saved_items?select=*" \
+          -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+          -o data_backups/saved_items_$(date +%Y-%m-%d).json
+          
+      - name: Commit and push
+        run: |
+          git config --global user.name "Bo (Automated)"
+          git config --global user.email "bo@openclaw.ai"
+          git add data_backups/
+          git commit -m "chore: nightly supabase backup $(date +%Y-%m-%d)"
+          git push
