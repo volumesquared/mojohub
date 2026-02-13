@@ -3,8 +3,104 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MojoHub 3.2 | Studio Flip</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>MojoHUB OS | Alex</title>
+    <script src="https://cdn.tailwindcss.com">
+        // --- MOJOHUB OS v3.5 ENGINE (Ground-Up Rebuild) ---
+        window.isOwner = false;
+        let savedItems = new Set();
+
+        function loadGuestData() {
+            const data = localStorage.getItem('mjh_guest_v5');
+            savedItems = data ? new Set(JSON.parse(data)) : new Set();
+            updateUIState();
+        }
+
+        async function enterOwnerMode() {
+            window.isOwner = true;
+            document.getElementById('login-btn').style.display = 'none';
+            document.getElementById('owner-status').style.display = 'flex';
+            const { data } = await window.supabaseClient.from('saved_items').select('book_id');
+            savedItems = new Set(data ? data.map(i => i.book_id) : []);
+            updateUIState();
+            showToast("Ka Sync Active");
+        }
+
+        function exitOwnerMode() {
+            window.isOwner = false;
+            document.getElementById('login-btn').style.display = 'block';
+            document.getElementById('owner-status').style.display = 'none';
+            loadGuestData();
+        }
+
+        window.addEventListener('load', async () => {
+            loadGuestData();
+            const { data: { session } } = await window.supabaseClient.auth.getSession();
+            if (session) await enterOwnerMode();
+            window.supabaseClient.auth.onAuthStateChange(async (e) => {
+                if (e === 'SIGNED_IN') await enterOwnerMode();
+                else if (e === 'SIGNED_OUT') exitOwnerMode();
+            });
+        });
+
+        async function performToggle(bookId) {
+            if (window.isOwner) {
+                const { data: { user } } = await window.supabaseClient.auth.getUser();
+                if (savedItems.has(bookId)) {
+                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
+                    savedItems.delete(bookId);
+                } else {
+                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
+                    savedItems.add(bookId);
+                }
+            } else {
+                if (savedItems.has(bookId)) savedItems.delete(bookId);
+                else savedItems.add(bookId);
+                localStorage.setItem('mjh_guest_v5', JSON.stringify([...savedItems]));
+            }
+            updateUIState();
+            if (typeof renderLibrary === 'function') renderLibrary(activeFilter);
+        }
+
+        function updateUIState() {
+            const el = document.getElementById('saved-count');
+            if(el) el.textContent = "(" + savedItems.size + ")";
+            
+            // Carousel Heart Sync
+            const rotatorBtn = document.getElementById('rotator-heart');
+            if (rotatorBtn && typeof quoteQueue !== 'undefined' && quoteQueue[currentQuoteIndex]) {
+                const isActive = savedItems.has(quoteQueue[currentQuoteIndex].bookId);
+                rotatorBtn.classList.toggle('bg-white/30', isActive);
+                const svg = rotatorBtn.querySelector('svg');
+                if(svg) {
+                    svg.setAttribute('fill', isActive ? 'white' : 'none');
+                    svg.setAttribute('stroke', isActive ? 'white' : 'currentColor');
+                }
+            }
+            
+            // Sync Tray/Card Hearts if open
+            const trayHearts = document.querySelectorAll('.heart-trigger svg, .flip-heart-trigger svg');
+            trayHearts.forEach(svg => {
+                // Find parent container to identify the book
+                const parent = svg.closest('[data-book-id]');
+                if(parent) {
+                    const active = savedItems.has(parseInt(parent.getAttribute('data-book-id')));
+                    svg.setAttribute('fill', active ? 'currentColor' : 'none');
+                }
+            });
+        }
+
+        function closeAuthModal() { document.getElementById('login-modal').classList.add('hidden'); }
+        function triggerOwnerAuth() { document.getElementById('login-modal').classList.remove('hidden'); document.getElementById('auth-email').focus(); }
+        async function handleLoginSubmit() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+            if (!error) closeAuthModal(); else showToast("Auth Failed");
+        }
+        async function handleSignOut() { await window.supabaseClient.auth.signOut(); location.reload(); }
+        function showToast(m) { const t = document.getElementById('toast'); if(t) { t.textContent = m; t.style.opacity = '1'; setTimeout(() => t.style.opacity = '0', 3000); } }
+
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
@@ -57,16 +153,6 @@
     </style>
 </head>
 <body class="bg-gray-50 text-gray-900 h-screen flex flex-col overflow-hidden">
-    <!-- AUTH MODAL -->
-    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
-        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
-        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl p-8">
-            <h3 class="text-xl font-serif font-bold mb-4">Owner Access</h3>
-            <input type="email" id="auth-email" class="w-full mb-4 p-3 bg-gray-50 border rounded-xl" placeholder="Email">
-            <input type="password" id="auth-password" class="w-full mb-4 p-3 bg-gray-50 border rounded-xl" placeholder="Password">
-            <button onclick="handleLoginSubmit()" class="w-full py-3 bg-gray-900 text-white rounded-xl font-bold">Sign In</button>
-        </div>
-    </div>
 
     <header class="w-full bg-white border-b border-gray-200 z-10 shrink-0 h-14">
         <div class="max-w-6xl mx-auto px-6 h-full flex items-center justify-between">
@@ -76,13 +162,15 @@
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                     <div class="w-2.5 h-2.5 rounded-full bg-slate-400"></div>
                 </div>
-                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHUB OS | Alex</span>
+                <span class="ml-4 font-semibold text-xs uppercase tracking-widest text-gray-500">MojoHub 3.3 | Alex</span>
             </div>
-            <div class="flex items-center gap-4">
-                <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full border text-[9px] font-bold uppercase">Login</button>
-                <div id="owner-status" style="display:none" class="items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border">
-                    <span class="text-[9px] font-bold text-indigo-600 uppercase">Ka</span>
-                    <button onclick="handleSignOut()" class="ml-1 text-indigo-300">×</button>
+            <div id="auth-section" class="flex items-center gap-4">
+                <button id="login-btn" onclick="triggerOwnerAuth()" class="px-3 py-1 rounded-full bg-gray-50 border border-gray-200 text-[9px] font-bold text-gray-400 uppercase tracking-widest hover:bg-gray-100 hover:text-gray-600 transition-all">Login</button>
+                <div id="owner-status" style="display:none" class="flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100">
+                    <span class="text-[9px] font-bold text-indigo-600 uppercase tracking-widest">Ka</span>
+                    <button onclick="handleSignOut()" class="ml-1 text-indigo-300 hover:text-indigo-600 transition-colors">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -256,6 +344,20 @@
         </aside>
     </main>
 
+        <!-- AUTH MODAL OVERLAY -->
+    <div id="login-modal" class="fixed inset-0 z-[100] flex items-center justify-center hidden">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" onclick="closeAuthModal()"></div>
+        <div class="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-100 p-8">
+            <div class="flex flex-col gap-6">
+                <div class="space-y-1"><h3 class="text-xl font-serif font-bold text-gray-900">Owner Access</h3><p class="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Identify yourself to sync</p></div>
+                <div class="space-y-4">
+                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Email</label><input type="email" id="auth-email" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500" placeholder="email@address.com" autocomplete="off"></div>
+                    <div class="space-y-1"><label class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em] ml-1">Password</label><input type="password" id="auth-password" class="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500" placeholder="••••••••"></div>
+                </div>
+                <button onclick="handleLoginSubmit()" class="w-full py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-all shadow-lg text-xs font-bold tracking-widest uppercase">Sign In</button>
+            </div>
+        </div>
+    </div>
     <div id="toast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider shadow-lg opacity-0 pointer-events-none transition-opacity duration-300 z-50"></div>
 
     <script>
@@ -1489,7 +1591,7 @@
         }
 
         function updateLibraryCounts() {
-            const savedCount = starterLibrary.filter(b => b.quotes.some(q => favorites.includes(q.text))).length;
+            const savedCount = starterLibrary.filter(b => b.quotes.some(q => savedItems.has(q.bookId))).length;
             document.getElementById('lib-count').textContent = `(${starterLibrary.length})`;
             document.getElementById('saved-count').textContent = `(${savedCount})`;
         }
@@ -1670,7 +1772,12 @@
                 li.className = `group/quote flex items-center justify-between py-4 cursor-pointer hover:bg-gray-50/50 px-2 transition-colors ${i !== book.quotes.length - 1 ? 'border-b border-gray-100' : ''}`;
                 li.innerHTML = `<div class="quote-nav-trigger flex-1 text-sm text-gray-700 italic leading-relaxed pr-4">“${qObj.text}”</div><div class="heart-trigger w-10 h-10 flex items-center justify-center shrink-0 transition-colors ${isF ? 'text-rose-500' : 'text-gray-200 hover:text-rose-400'}"><svg class="w-4 h-4" fill="${isF ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg></div>`;
                 li.querySelector('.quote-nav-trigger').onclick = (e) => { e.stopPropagation(); const targetIdx = quoteQueue.findIndex(item => item.text === qObj.text); if (targetIdx !== -1) { currentQuoteIndex = targetIdx; transitionQuote(); showToast("Perspective Swapped"); const scrollArea = document.getElementById('blueprint-content'); if (scrollArea) scrollArea.scrollTo({ top: 0, behavior: 'smooth' }); } };
-                li.querySelector('.heart-trigger').onclick = (e) => { e.stopPropagation(); if(favorites.includes(qObj.text)) favorites = favorites.filter(f => f !== qObj.text); else favorites.push(qObj.text); saveState(); injectBlueprint(book); buildQuoteQueue(); updateHeartUI(quoteQueue[currentQuoteIndex]); };
+                li.querySelector('.heart-trigger').onclick = async (e) => { 
+                    e.stopPropagation(); 
+                    await performToggle(book.id); 
+                    injectBlueprint(book); 
+                };
+                li.setAttribute('data-book-id', book.id);
                 list.appendChild(li);
             });
         }
@@ -1678,11 +1785,15 @@
         function updateHeartUI(q) {
             const btn = document.getElementById('rotator-heart');
             const svg = btn.querySelector('svg');
-            if(favorites.includes(q.text)) { btn.classList.add('bg-white/30'); svg.setAttribute('fill', 'white'); svg.setAttribute('stroke', 'white'); } 
+            if(savedItems.has(q.bookId)) { btn.classList.add('bg-white/30'); svg.setAttribute('fill', 'white'); svg.setAttribute('stroke', 'white'); } 
             else { btn.classList.remove('bg-white/30'); svg.setAttribute('fill', 'none'); svg.setAttribute('stroke', 'currentColor'); }
         }
 
-        function toggleHeartCurrent() { const q = quoteQueue[currentQuoteIndex]; if(favorites.includes(q.text)) favorites = favorites.filter(f => f !== q.text); else favorites.push(q.text); saveState(); updateHeartUI(q); buildQuoteQueue(); }
+        async function toggleHeartCurrent() {
+            if (typeof quoteQueue === 'undefined' || !quoteQueue[currentQuoteIndex]) return;
+            const bookId = quoteQueue[currentQuoteIndex].bookId;
+            await performToggle(bookId);
+        }
 
         function toggleDetail(e) {
             const view = document.getElementById('detail-view');
@@ -1832,7 +1943,7 @@
         function renderLibrary(filter) {
             const list = document.getElementById('library-list');
             list.innerHTML = '';
-            const books = (filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(q => favorites.includes(q.text)))).filter(b => activeCategories.length === 0 || activeCategories.includes(b.category));
+            const books = (filter === 'all' ? starterLibrary : starterLibrary.filter(b => b.quotes.some(q => savedItems.has(q.bookId)))).filter(b => activeCategories.length === 0 || activeCategories.includes(b.category));
             const cats = {};
             books.forEach(b => { if(!cats[b.category]) cats[b.category] = []; cats[b.category].push(b); });
             Object.keys(cats).sort().forEach(c => {
@@ -1944,64 +2055,102 @@
         function showToast(msg) { const toast = document.getElementById('toast'); toast.textContent = msg; toast.classList.remove('opacity-0'); setTimeout(() => toast.classList.add('opacity-0'), 2000); }
         
         window.addEventListener('DOMContentLoaded', init);
-    </script>
-
-    <script>
+    
+        // --- MOJOHUB OS v3.5 ENGINE (Ground-Up Rebuild) ---
         window.isOwner = false;
         let savedItems = new Set();
-        
+
+        function loadGuestData() {
+            const data = localStorage.getItem('mjh_guest_v5');
+            savedItems = data ? new Set(JSON.parse(data)) : new Set();
+            updateUIState();
+        }
+
         async function enterOwnerMode() {
             window.isOwner = true;
             document.getElementById('login-btn').style.display = 'none';
             document.getElementById('owner-status').style.display = 'flex';
             const { data } = await window.supabaseClient.from('saved_items').select('book_id');
             savedItems = new Set(data ? data.map(i => i.book_id) : []);
-            syncAndRender();
+            updateUIState();
+            showToast("Ka Sync Active");
         }
 
-        function loadGuestData() {
-            const data = localStorage.getItem('mjh_guest_v5');
-            savedItems = data ? new Set(JSON.parse(data)) : new Set();
-            syncAndRender();
-        }
-
-        function syncAndRender() {
-            if (typeof favorites !== 'undefined') {
-                favorites = starterLibrary.filter(b => savedItems.has(b.id)).flatMap(b => b.quotes.map(q => q.text));
-            }
-            if (typeof updateSavedUI === 'function') updateSavedUI();
-            if (typeof buildQuoteQueue === 'function') buildQuoteQueue();
-            if (typeof renderLibrary === 'function') renderLibrary(typeof filter === 'undefined' ? 'all' : filter);
+        function exitOwnerMode() {
+            window.isOwner = false;
+            document.getElementById('login-btn').style.display = 'block';
+            document.getElementById('owner-status').style.display = 'none';
+            loadGuestData();
         }
 
         window.addEventListener('load', async () => {
             loadGuestData();
             const { data: { session } } = await window.supabaseClient.auth.getSession();
             if (session) await enterOwnerMode();
+            window.supabaseClient.auth.onAuthStateChange(async (e) => {
+                if (e === 'SIGNED_IN') await enterOwnerMode();
+                else if (e === 'SIGNED_OUT') exitOwnerMode();
+            });
         });
 
-        async function toggleHeartCurrent() {
-            const bookId = quoteQueue[currentQuoteIndex].bookId;
+        async function performToggle(bookId) {
             if (window.isOwner) {
                 const { data: { user } } = await window.supabaseClient.auth.getUser();
-                if (savedItems.has(bookId)) await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
-                else await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
-                await enterOwnerMode();
+                if (savedItems.has(bookId)) {
+                    await window.supabaseClient.from('saved_items').delete().eq('book_id', bookId).eq('user_id', user.id);
+                    savedItems.delete(bookId);
+                } else {
+                    await window.supabaseClient.from('saved_items').insert([{ book_id: bookId, user_id: user.id }]);
+                    savedItems.add(bookId);
+                }
             } else {
-                if (savedItems.has(bookId)) savedItems.delete(bookId); else savedItems.add(bookId);
+                if (savedItems.has(bookId)) savedItems.delete(bookId);
+                else savedItems.add(bookId);
                 localStorage.setItem('mjh_guest_v5', JSON.stringify([...savedItems]));
-                syncAndRender();
             }
+            updateUIState();
+            if (typeof renderLibrary === 'function') renderLibrary(activeFilter);
         }
 
-        function triggerOwnerAuth() { document.getElementById('login-modal').classList.remove('hidden'); }
+        function updateUIState() {
+            const el = document.getElementById('saved-count');
+            if(el) el.textContent = "(" + savedItems.size + ")";
+            
+            // Carousel Heart Sync
+            const rotatorBtn = document.getElementById('rotator-heart');
+            if (rotatorBtn && typeof quoteQueue !== 'undefined' && quoteQueue[currentQuoteIndex]) {
+                const isActive = savedItems.has(quoteQueue[currentQuoteIndex].bookId);
+                rotatorBtn.classList.toggle('bg-white/30', isActive);
+                const svg = rotatorBtn.querySelector('svg');
+                if(svg) {
+                    svg.setAttribute('fill', isActive ? 'white' : 'none');
+                    svg.setAttribute('stroke', isActive ? 'white' : 'currentColor');
+                }
+            }
+            
+            // Sync Tray/Card Hearts if open
+            const trayHearts = document.querySelectorAll('.heart-trigger svg, .flip-heart-trigger svg');
+            trayHearts.forEach(svg => {
+                // Find parent container to identify the book
+                const parent = svg.closest('[data-book-id]');
+                if(parent) {
+                    const active = savedItems.has(parseInt(parent.getAttribute('data-book-id')));
+                    svg.setAttribute('fill', active ? 'currentColor' : 'none');
+                }
+            });
+        }
+
         function closeAuthModal() { document.getElementById('login-modal').classList.add('hidden'); }
+        function triggerOwnerAuth() { document.getElementById('login-modal').classList.remove('hidden'); document.getElementById('auth-email').focus(); }
         async function handleLoginSubmit() {
-            const e = document.getElementById('auth-email').value, p = document.getElementById('auth-password').value;
-            const { error } = await window.supabaseClient.auth.signInWithPassword({ email: e, password: p });
-            if (!error) { closeAuthModal(); await enterOwnerMode(); } else alert("Auth Failed");
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+            if (!error) closeAuthModal(); else showToast("Auth Failed");
         }
         async function handleSignOut() { await window.supabaseClient.auth.signOut(); location.reload(); }
+        function showToast(m) { const t = document.getElementById('toast'); if(t) { t.textContent = m; t.style.opacity = '1'; setTimeout(() => t.style.opacity = '0', 3000); } }
+
     </script>
 </body>
 </html>
